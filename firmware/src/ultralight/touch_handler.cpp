@@ -2,6 +2,7 @@
 #include "persistence.h"
 #include "DataLogger.h"
 #include <algorithm>  // For std::sort
+#include <map>
 
 extern bool raceRunning;
 extern uint32_t raceStartTime;
@@ -9,6 +10,7 @@ extern uint32_t raceDuration;
 extern String currentRaceName;
 extern DataLogger dataLogger;
 extern PersistenceManager persistence;
+extern std::map<uint8_t, bool> beaconPresence;
 
 // ============================================================
 // Main Touch Handler
@@ -458,6 +460,10 @@ void handleRaceSetupTouch(uint16_t x, uint16_t y) {
         
         // Reset all teams
         lapCounter.reset();
+        
+        // Reset beacon presence tracking
+        beaconPresence.clear();
+        Serial.println("[Race] Beacon presence tracking reset");
         
         uiState.currentScreen = SCREEN_RACE_RUNNING;
         uiState.needsRedraw = true;

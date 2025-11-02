@@ -43,9 +43,13 @@
 // BLE Scanner
 #define BLE_SCAN_INTERVAL 100      // ms
 #define BLE_SCAN_WINDOW 99         // ms
-#define BLE_RSSI_THRESHOLD -80     // dBm
-#define BLE_PROXIMITY_THRESHOLD 10.0 // meters (sehr tolerant für Testing)
-#define BEACON_TIMEOUT 30000       // ms (30 seconds - viel toleranter)
+#define BLE_RSSI_THRESHOLD -100    // dBm (sehr tolerant)
+#define BEACON_TIMEOUT 3000        // ms (3 Sekunden = "weggefahren")
+#define BLE_UUID_PREFIX "c3:00:"   // Nur diese Beacons scannen
+
+// Lap Detection (RSSI-basierte Hysterese)
+#define LAP_RSSI_NEAR -65          // dBm - Beacon ist NAH (Ziellinie)
+#define LAP_RSSI_FAR -80           // dBm - Beacon ist WEG (weggefahren)
 
 // Touch
 #define TOUCH_DEBOUNCE 200         // ms

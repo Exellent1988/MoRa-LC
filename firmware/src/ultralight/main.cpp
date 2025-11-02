@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <SPI.h>
+#include <map>
 #include "config.h"
 #include "BLEScanner.h"
 #include "LapCounter.h"
@@ -39,6 +40,9 @@ bool raceRunning = false;
 uint32_t raceStartTime = 0;
 uint32_t raceDuration = 60 * 60 * 1000;  // 60 minutes default
 String currentRaceName = "";
+
+// Beacon Presence Tracking (für Lap Detection)
+std::map<uint8_t, bool> beaconPresence;
 
 // ============================================================
 // Forward Declarations
@@ -125,13 +129,36 @@ void loop() {
         }
     }
     
-    // Race Running: Update display
+    // Race Running: Update display & check beacon timeouts
     if (raceRunning) {
         // Update every second
         static uint32_t lastUpdate = 0;
         if (millis() - lastUpdate > 1000) {
             drawRaceRunningScreen();
             lastUpdate = millis();
+        }
+        
+        // Check for Timeout (Beacon nicht mehr gesehen) - alle 500ms
+        static uint32_t lastPresenceCheck = 0;
+        if (millis() - lastPresenceCheck > 500) {
+            // Durch alle Teams gehen
+            for (uint8_t teamId = 1; teamId <= lapCounter.getTeamCount(); teamId++) {
+                TeamData* team = lapCounter.getTeam(teamId);
+                if (!team || team->beaconUUID.length() == 0) continue;
+                
+                // Beacon im Scanner suchen (per MAC-Adresse = beaconUUID)
+                BeaconData* beacon = bleScanner.getBeacon(team->beaconUUID);
+                
+                // Wenn Beacon nicht mehr im Scanner ODER zu alt → "weg"
+                if (!beacon || (millis() - beacon->lastSeen > BEACON_TIMEOUT)) {
+                    if (beaconPresence[teamId]) {
+                        Serial.printf("[Lap] Team %u: WEG (timeout: %s)\n", 
+                                     teamId, !beacon ? "not found" : "too old");
+                        beaconPresence[teamId] = false;
+                    }
+                }
+            }
+            lastPresenceCheck = millis();
         }
         
         // Check if race time is up
@@ -142,15 +169,18 @@ void loop() {
             
             bleScanner.stopScan();
             
+            // Reset presence tracking
+            beaconPresence.clear();
+            
             Serial.println("\n=== RACE FINISHED ===");
         }
     }
     
-    // Clean up old beacons (only when scanning)
-    if (bleScanner.isScanning()) {
+    // Clean up old beacons (only when NOT racing, for beacon assignment UI)
+    if (bleScanner.isScanning() && !raceRunning) {
         static uint32_t lastCleanup = 0;
         if (millis() - lastCleanup > 5000) {  // Check every 5 seconds
-            bleScanner.clearOldBeacons(BEACON_TIMEOUT);  // But remove only > 30s old
+            bleScanner.clearOldBeacons(BEACON_TIMEOUT);
             lastCleanup = millis();
         }
     }
@@ -211,9 +241,11 @@ void initBLE() {
     }
     
     bleScanner.setRSSIThreshold(BLE_RSSI_THRESHOLD);
+    bleScanner.setUUIDFilter(BLE_UUID_PREFIX);  // Nur c3:00:... Beacons
     bleScanner.onBeaconDetected(onBeaconDetected);
     
     Serial.println("[BLE] Initialized");
+    Serial.printf("[BLE] Scanning for: %s*\n", BLE_UUID_PREFIX);
 }
 
 void initSD() {
@@ -322,51 +354,56 @@ void drawScreen() {
 // ============================================================
 
 void onBeaconDetected(const BeaconData& beacon) {
-    // Check if beacon belongs to a team
-    TeamData* team = lapCounter.getTeamByBeacon(beacon.uuid);
+    // NUR während des Rennens Runden zählen!
+    if (!raceRunning) {
+        return;
+    }
+    
+    // Check if beacon belongs to a team (per MAC-Adresse!)
+    TeamData* team = lapCounter.getTeamByBeacon(beacon.macAddress);
     
     if (!team) {
-        // Unknown beacon
-        Serial.printf("[Beacon] Unknown: %s (RSSI: %d, Dist: %.2fm)\n",
-                     beacon.uuid.c_str(), beacon.rssi,
-                     BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower));
+        // Unknown beacon - silent (zu viel spam)
         return;
     }
     
-    // Check proximity
-    float distance = BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower);
-    Serial.printf("[Beacon] Team %u (%s): RSSI=%d, Dist=%.2fm, Threshold=%.1fm, Race=%s\n",
-                 team->teamId, team->teamName.c_str(), beacon.rssi, distance, 
-                 BLE_PROXIMITY_THRESHOLD, raceRunning ? "RUNNING" : "STOPPED");
+    // RSSI-basierte Presence Detection mit Hysterese:
+    // - "NAH" (present) wenn RSSI > -65 dBm
+    // - "WEG" (absent) wenn RSSI < -80 dBm
     
-    if (distance > BLE_PROXIMITY_THRESHOLD) {
-        // Too far
-        Serial.printf("[Beacon] Team %u: TOO FAR (%.2fm > %.1fm)\n", 
-                     team->teamId, distance, BLE_PROXIMITY_THRESHOLD);
-        return;
-    }
-    
-    // Record lap if race is running
-    if (raceRunning) {
-        Serial.printf("[Beacon] Team %u: Attempting lap record...\n", team->teamId);
-        if (lapCounter.recordLap(team->teamId, beacon.lastSeen)) {
-            Serial.printf("[Lap] ✅ Team %u (%s): Runde %u erfolgreich gezahlt!\n",
-                         team->teamId, team->teamName.c_str(), team->lapCount);
+    if (beacon.rssi > LAP_RSSI_NEAR) {
+        // Beacon ist NAH (starkes Signal)!
+        if (!beaconPresence[team->teamId]) {
+            // War vorher WEG, jetzt NAH → Runde zählen!
+            Serial.printf("[Lap] Team %u: NAH! (RSSI=%d dBm) - Runde zählen...\n", 
+                         team->teamId, beacon.rssi);
             
-            // Log to SD
-            if (dataLogger.isReady() && team->laps.size() > 0) {
-                LapTime& lap = team->laps.back();
-                dataLogger.logLap(team->teamId, team->teamName, 
-                                 lap.lapNumber, lap.timestamp, lap.duration);
+            if (lapCounter.recordLap(team->teamId, beacon.lastSeen)) {
+                Serial.printf("[Lap] ✅ Team %u (%s): Runde %u gezahlt!\n",
+                             team->teamId, team->teamName.c_str(), team->lapCount);
+                
+                // Log to SD
+                if (dataLogger.isReady() && team->laps.size() > 0) {
+                    LapTime& lap = team->laps.back();
+                    dataLogger.logLap(team->teamId, team->teamName, 
+                                     lap.lapNumber, lap.timestamp, lap.duration);
+                }
+                
+                // Update screen
+                uiState.needsRedraw = true;
             }
             
-            // Update screen
-            uiState.needsRedraw = true;
-        } else {
-            Serial.printf("[Lap] ❌ Team %u: Runde NICHT gezahlt (zu schnell oder Fehler)\n", team->teamId);
+            // Beacon ist jetzt "present"
+            beaconPresence[team->teamId] = true;
         }
-    } else {
-        Serial.printf("[Beacon] Team %u: Rennen nicht gestartet, ignoriere Beacon\n", team->teamId);
+        // Else: Beacon war schon "present", kein Spam
+    } else if (beacon.rssi < LAP_RSSI_FAR) {
+        // Beacon ist WEG (schwaches Signal)!
+        if (beaconPresence[team->teamId]) {
+            Serial.printf("[Lap] Team %u: WEG! (RSSI=%d dBm)\n", team->teamId, beacon.rssi);
+            beaconPresence[team->teamId] = false;
+        }
     }
+    // Else: Zwischen -80 und -65 dBm → Hysterese, Status beibehalten
 }
 

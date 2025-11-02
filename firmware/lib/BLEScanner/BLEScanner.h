@@ -14,14 +14,16 @@
  */
 
 struct BeaconData {
-    String uuid;
+    String uuid;        // iBeacon UUID oder MAC-Adresse
+    String macAddress;  // Immer die MAC-Adresse (für Zuordnung)
     uint16_t major;
     uint16_t minor;
     int8_t rssi;
     int8_t txPower;
     uint32_t lastSeen;  // millis()
+    bool wasPresent;    // Für Presence Detection
     
-    BeaconData() : major(0), minor(0), rssi(0), txPower(-59), lastSeen(0) {}
+    BeaconData() : major(0), minor(0), rssi(0), txPower(-59), lastSeen(0), wasPresent(false) {}
 };
 
 typedef std::function<void(const BeaconData&)> BeaconCallback;

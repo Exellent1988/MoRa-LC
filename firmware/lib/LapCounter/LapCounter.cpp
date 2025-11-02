@@ -102,9 +102,9 @@ bool LapCounter::recordLap(uint8_t teamId, uint32_t timestamp) {
     // Runden-Dauer berechnen
     uint32_t duration = timestamp - team->lastLapTime;
     
-    // Plausibilitätsprüfung: Mindestens 3 Sekunden pro Runde (für Testing)
-    if (duration < 3000) {
-        Serial.printf("[LapCounter] Team %u: Lap too fast (%u ms < 3000 ms), ignored\n",
+    // Plausibilitätsprüfung: Mindestens 5 Sekunden pro Runde
+    if (duration < 5000) {
+        Serial.printf("[LapCounter] Team %u: Lap too fast (%u ms < 5000 ms), ignored\n",
                      team->teamId, duration);
         return false;
     }

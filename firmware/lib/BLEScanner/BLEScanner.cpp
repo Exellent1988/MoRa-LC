@@ -30,11 +30,13 @@ bool BLEScanner::begin() {
     callbacks = new AdvertisedDeviceCallbacks(this);
     pBLEScan->setScanCallbacks(callbacks);
     
-    pBLEScan->setActiveScan(false);  // Passive scan (stromsparender)
-    pBLEScan->setInterval(100);       // ms
-    pBLEScan->setWindow(99);          // ms
+    pBLEScan->setActiveScan(true);   // Active scan für bessere Erkennung
+    pBLEScan->setInterval(100);      // ms
+    pBLEScan->setWindow(99);         // ms
+    pBLEScan->setDuplicateFilter(false);  // Auch Duplicates melden!
     
     Serial.println("[BLE] Initialized successfully");
+    Serial.println("[BLE] Duplicate filter disabled - will report all beacons");
     return true;
 }
 
@@ -144,21 +146,32 @@ float BLEScanner::rssiToDistance(int8_t rssi, int8_t txPower) {
 void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
     BeaconData beacon;
     
+    // MAC-Adresse immer speichern
+    beacon.macAddress = advertisedDevice->getAddress().toString().c_str();
+    
+    // MAC-Adresse Filter (nur c3:00:... für Tracking-Beacons)
+    if (scanner->uuidFilter.length() > 0) {
+        if (!beacon.macAddress.startsWith(scanner->uuidFilter)) {
+            // Nicht unser Beacon, ignorieren
+            return;
+        }
+    }
+    
     // Try to parse as iBeacon first
     if (!scanner->parseIBeacon(advertisedDevice, beacon)) {
         // Fallback: Use MAC address as UUID for non-iBeacon devices
-        beacon.uuid = advertisedDevice->getAddress().toString().c_str();
+        beacon.uuid = beacon.macAddress;
         beacon.major = 0;
         beacon.minor = 0;
         beacon.txPower = -59;  // Default TX power
         beacon.rssi = advertisedDevice->getRSSI();
         beacon.lastSeen = millis();
         
-        Serial.printf("[BLE] Non-iBeacon device: %s (RSSI: %d dBm)\n", 
+        Serial.printf("[BLE] Tracking-Beacon: %s (RSSI: %d dBm)\n", 
                      beacon.uuid.c_str(), beacon.rssi);
     } else {
-        Serial.printf("[BLE] iBeacon: %s (RSSI: %d dBm)\n", 
-                     beacon.uuid.c_str(), beacon.rssi);
+        Serial.printf("[BLE] iBeacon: MAC=%s, UUID=%s (RSSI: %d dBm)\n", 
+                     beacon.macAddress.c_str(), beacon.uuid.c_str(), beacon.rssi);
     }
     
     // RSSI Filter (more lenient for testing)
@@ -170,33 +183,29 @@ void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevic
     }
     Serial.println("[BLE] ✓ RSSI OK");
     
-    // UUID Filter (optional)
-    if (scanner->uuidFilter.length() > 0) {
-        Serial.printf("[BLE] Checking UUID filter: '%s' vs '%s'\n", 
-                     beacon.uuid.c_str(), scanner->uuidFilter.c_str());
-        if (beacon.uuid != scanner->uuidFilter) {
-            Serial.printf("[BLE] ❌ Filtered out: UUID doesn't match filter\n");
-            return;
-        }
-    }
-    Serial.println("[BLE] ✓ UUID OK");
-    
-    // Update beacon data
-    String key = beacon.uuid;
+    // Update beacon data (Key = MAC-Adresse!)
+    String key = beacon.macAddress;
     bool isNew = (scanner->beacons.find(key) == scanner->beacons.end());
     
+    // Presence Detection: War Beacon vorher weg?
+    if (!isNew) {
+        beacon.wasPresent = scanner->beacons[key].wasPresent;
+    }
+    
     scanner->beacons[key] = beacon;
+    scanner->beacons[key].wasPresent = true;  // Jetzt ist er da
+    
     Serial.printf("[BLE] ✅ Beacon stored! Total beacons: %u\n", scanner->beacons.size());
     
     if (isNew) {
-        Serial.printf("[BLE] New beacon: UUID=%s, Major=%u, Minor=%u, RSSI=%d dBm, Dist=%.2fm\n",
-                     beacon.uuid.c_str(), beacon.major, beacon.minor, beacon.rssi,
+        Serial.printf("[BLE] New beacon: MAC=%s, RSSI=%d dBm, Dist=%.2fm\n",
+                     beacon.macAddress.c_str(), beacon.rssi,
                      BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower));
     }
     
-    // Callback aufrufen
+    // Callback IMMER aufrufen (auch für Updates!)
     if (scanner->beaconCallback) {
-        scanner->beaconCallback(beacon);
+        scanner->beaconCallback(scanner->beacons[key]);
     }
 }
 
