@@ -44,6 +44,10 @@ String currentRaceName = "";
 // Beacon Presence Tracking (für Lap Detection)
 std::map<uint8_t, bool> beaconPresence;
 
+// RSSI Thresholds (anpassbar in Settings!)
+int8_t lapRssiNear = DEFAULT_LAP_RSSI_NEAR;  // -65 dBm
+int8_t lapRssiFar = DEFAULT_LAP_RSSI_FAR;    // -80 dBm
+
 // ============================================================
 // Forward Declarations
 // ============================================================
@@ -275,6 +279,9 @@ void initPersistence() {
     persistence.loadConfig(currentRaceName, raceDuration);
     raceDuration *= 60 * 1000;  // Convert minutes to milliseconds
     
+    // Load RSSI thresholds
+    persistence.loadRssiThresholds(lapRssiNear, lapRssiFar);
+    
     Serial.printf("[Persistence] Loaded %u teams\n", lapCounter.getTeamCount());
 }
 
@@ -368,10 +375,10 @@ void onBeaconDetected(const BeaconData& beacon) {
     }
     
     // RSSI-basierte Presence Detection mit Hysterese:
-    // - "NAH" (present) wenn RSSI > -65 dBm
-    // - "WEG" (absent) wenn RSSI < -80 dBm
+    // - "NAH" (present) wenn RSSI > lapRssiNear
+    // - "WEG" (absent) wenn RSSI < lapRssiFar
     
-    if (beacon.rssi > LAP_RSSI_NEAR) {
+    if (beacon.rssi > lapRssiNear) {
         // Beacon ist NAH (starkes Signal)!
         if (!beaconPresence[team->teamId]) {
             // War vorher WEG, jetzt NAH → Runde zählen!
@@ -397,7 +404,7 @@ void onBeaconDetected(const BeaconData& beacon) {
             beaconPresence[team->teamId] = true;
         }
         // Else: Beacon war schon "present", kein Spam
-    } else if (beacon.rssi < LAP_RSSI_FAR) {
+    } else if (beacon.rssi < lapRssiFar) {
         // Beacon ist WEG (schwaches Signal)!
         if (beaconPresence[team->teamId]) {
             Serial.printf("[Lap] Team %u: WEG! (RSSI=%d dBm)\n", team->teamId, beacon.rssi);

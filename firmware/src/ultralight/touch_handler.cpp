@@ -46,11 +46,7 @@ void handleTouch(uint16_t x, uint16_t y) {
             handleRaceResultsTouch(x, y);
             break;
         case SCREEN_SETTINGS:
-            // Back button
-            if (isTouchInRect(x, y, SCREEN_WIDTH - 60, 0, 60, HEADER_HEIGHT)) {
-                uiState.currentScreen = SCREEN_HOME;
-                uiState.needsRedraw = true;
-            }
+            handleSettingsTouch(x, y);
             break;
         default:
             break;
@@ -62,7 +58,7 @@ void handleTouch(uint16_t x, uint16_t y) {
 // ============================================================
 
 void handleHomeTouch(uint16_t x, uint16_t y) {
-    int btnY = HEADER_HEIGHT + 20;
+    int btnY = HEADER_HEIGHT + 12;
     int btnWidth = SCREEN_WIDTH - 2 * BUTTON_MARGIN;
     
     // Neues Rennen
@@ -115,7 +111,7 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
     int itemNum = 0;
     
     for (auto* team : teams) {
-        if (itemNum >= 4) break;  // Max 4 visible
+        if (itemNum >= 3) break;  // Max 3 visible
         
         if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT)) {
             // Edit this team
@@ -165,10 +161,10 @@ void handleTeamEditTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    int btnY = HEADER_HEIGHT + 20;
+    int btnY = HEADER_HEIGHT + 15;
     
     // Team Name edit
-    if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 40)) {
+    if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 36)) {
         String newName = inputText("Team-Name", uiState.editingTeamName);
         if (newName.length() > 0) {
             uiState.editingTeamName = newName;
@@ -177,10 +173,10 @@ void handleTeamEditTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    btnY += 80;
+    btnY += 70;
     
     // Beacon assignment
-    if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 40)) {
+    if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 36)) {
         uiState.previousScreen = SCREEN_TEAM_EDIT;
         uiState.currentScreen = SCREEN_TEAM_BEACON_ASSIGN;
         uiState.needsRedraw = true;
@@ -192,7 +188,7 @@ void handleTeamEditTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    btnY += 80;
+    btnY += 70;
     
     // Save button
     if (isTouchInRect(x, y, 10, btnY, (SCREEN_WIDTH - 30) / 2, BUTTON_HEIGHT)) {
@@ -251,12 +247,16 @@ void handleBeaconAssignTouch(uint16_t x, uint16_t y) {
                 // Assign beacon to current team
                 TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
                 if (team) {
-                    team->beaconUUID = nearest->uuid;
+                    // WICHTIG: MAC-Adresse speichern, nicht UUID!
+                    team->beaconUUID = nearest->macAddress;
                     
                     // Save to NVS
                     if (persistence.isInitialized()) {
                         persistence.saveTeams(lapCounter);
                     }
+                    
+                    Serial.printf("[Team %u] Beacon zugeordnet: MAC=%s (UUID=%s)\n", 
+                                 uiState.editingTeamId, nearest->macAddress.c_str(), nearest->uuid.c_str());
                     
                     showMessage("Zugeordnet", "Beacon erfolgreich zugeordnet", COLOR_SECONDARY);
                     bleScanner.stopScan();
@@ -310,8 +310,8 @@ void handleBeaconListTouch(uint16_t x, uint16_t y) {
         int itemY = y_start + (index * itemHeight);
         
         if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 20, 32)) {  // Kompakter: 38 -> 32
-            Serial.printf("[Touch] Beacon #%d angeklickt: %s (RSSI=%d) at y=%d\n", 
-                         index, beacon.uuid.c_str(), beacon.rssi, itemY);
+            Serial.printf("[Touch] Beacon #%d angeklickt: MAC=%s UUID=%s (RSSI=%d) at y=%d\n", 
+                         index, beacon.macAddress.c_str(), beacon.uuid.c_str(), beacon.rssi, itemY);
             
             float dist = BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower);
             
@@ -320,14 +320,16 @@ void handleBeaconListTouch(uint16_t x, uint16_t y) {
                 TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
                 
                 if (team) {
-                    team->beaconUUID = beacon.uuid;
+                    // WICHTIG: MAC-Adresse speichern, nicht UUID!
+                    team->beaconUUID = beacon.macAddress;
                     
                     // Save to NVS
                     if (persistence.isInitialized()) {
                         persistence.saveTeams(lapCounter);
                     }
                     
-                    Serial.printf("[Team %u] Beacon zugeordnet: %s\n", uiState.editingTeamId, beacon.uuid.c_str());
+                    Serial.printf("[Team %u] Beacon zugeordnet: MAC=%s (UUID=%s)\n", 
+                                 uiState.editingTeamId, beacon.macAddress.c_str(), beacon.uuid.c_str());
                     
                     showMessage("Zugeordnet", "Beacon erfolgreich zugeordnet", COLOR_SECONDARY);
                     bleScanner.stopScan();
@@ -556,6 +558,90 @@ void handleRaceResultsTouch(uint16_t x, uint16_t y) {
                 showMessage("Gespeichert", filename, COLOR_SECONDARY);
             }
         }
+    }
+}
+
+void handleSettingsTouch(uint16_t x, uint16_t y) {
+    // Back button
+    if (isTouchInRect(x, y, SCREEN_WIDTH - 60, 0, 60, HEADER_HEIGHT)) {
+        uiState.currentScreen = SCREEN_HOME;
+        uiState.needsRedraw = true;
+        return;
+    }
+    
+    int yStart = HEADER_HEIGHT + 8 + 15;
+    int btnW = 35;
+    int valW = 60;
+    int xVal = 130;
+    
+    // === RSSI NEAR Controls ===
+    int yNear = yStart;
+    
+    // "-" Button (NEAR)
+    if (isTouchInRect(x, y, xVal - btnW - 5, yNear - 3, btnW, 28)) {
+        if (lapRssiNear > MIN_RSSI) {
+            lapRssiNear -= 5;
+            
+            // Save to NVS
+            if (persistence.isInitialized()) {
+                persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            }
+            
+            Serial.printf("[Settings] RSSI NEAR: %d dBm\n", lapRssiNear);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // "+" Button (NEAR)
+    if (isTouchInRect(x, y, xVal + valW + 5, yNear - 3, btnW, 28)) {
+        if (lapRssiNear < MAX_RSSI) {
+            lapRssiNear += 5;
+            
+            // Save to NVS
+            if (persistence.isInitialized()) {
+                persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            }
+            
+            Serial.printf("[Settings] RSSI NEAR: %d dBm\n", lapRssiNear);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // === RSSI FAR Controls ===
+    int yFar = yStart + 33;
+    
+    // "-" Button (FAR)
+    if (isTouchInRect(x, y, xVal - btnW - 5, yFar - 3, btnW, 28)) {
+        if (lapRssiFar > MIN_RSSI) {
+            lapRssiFar -= 5;
+            
+            // Save to NVS
+            if (persistence.isInitialized()) {
+                persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            }
+            
+            Serial.printf("[Settings] RSSI FAR: %d dBm\n", lapRssiFar);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // "+" Button (FAR)
+    if (isTouchInRect(x, y, xVal + valW + 5, yFar - 3, btnW, 28)) {
+        if (lapRssiFar < MAX_RSSI) {
+            lapRssiFar += 5;
+            
+            // Save to NVS
+            if (persistence.isInitialized()) {
+                persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            }
+            
+            Serial.printf("[Settings] RSSI FAR: %d dBm\n", lapRssiFar);
+            uiState.needsRedraw = true;
+        }
+        return;
     }
 }
 

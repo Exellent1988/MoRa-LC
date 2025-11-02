@@ -1,4 +1,5 @@
 #include "persistence.h"
+#include "config.h"
 
 const char* PersistenceManager::NAMESPACE_TEAMS = "teams";
 const char* PersistenceManager::NAMESPACE_CONFIG = "config";
@@ -8,6 +9,8 @@ const char* PersistenceManager::KEY_TEAM_NAME = "name";
 const char* PersistenceManager::KEY_TEAM_BEACON = "beacon";
 const char* PersistenceManager::KEY_RACE_NAME = "racename";
 const char* PersistenceManager::KEY_RACE_DURATION = "duration";
+const char* PersistenceManager::KEY_RSSI_NEAR = "rssinear";
+const char* PersistenceManager::KEY_RSSI_FAR = "rssifar";
 
 PersistenceManager::PersistenceManager() 
     : initialized(false) {
@@ -153,6 +156,32 @@ uint8_t PersistenceManager::getTeamCount() {
     preferences.end();
     
     return count;
+}
+
+bool PersistenceManager::saveRssiThresholds(int8_t rssiNear, int8_t rssiFar) {
+    if (!initialized) return false;
+    
+    preferences.begin(NAMESPACE_CONFIG, false);
+    preferences.putChar(KEY_RSSI_NEAR, rssiNear);
+    preferences.putChar(KEY_RSSI_FAR, rssiFar);
+    preferences.end();
+    
+    Serial.printf("[Persistence] RSSI thresholds saved: NEAR=%d, FAR=%d\n", 
+                 rssiNear, rssiFar);
+    return true;
+}
+
+bool PersistenceManager::loadRssiThresholds(int8_t& rssiNear, int8_t& rssiFar) {
+    if (!initialized) return false;
+    
+    preferences.begin(NAMESPACE_CONFIG, true);
+    rssiNear = preferences.getChar(KEY_RSSI_NEAR, DEFAULT_LAP_RSSI_NEAR);
+    rssiFar = preferences.getChar(KEY_RSSI_FAR, DEFAULT_LAP_RSSI_FAR);
+    preferences.end();
+    
+    Serial.printf("[Persistence] RSSI thresholds loaded: NEAR=%d, FAR=%d\n", 
+                 rssiNear, rssiFar);
+    return true;
 }
 
 bool PersistenceManager::isInitialized() {

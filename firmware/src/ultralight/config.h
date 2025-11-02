@@ -47,9 +47,11 @@
 #define BEACON_TIMEOUT 3000        // ms (3 Sekunden = "weggefahren")
 #define BLE_UUID_PREFIX "c3:00:"   // Nur diese Beacons scannen
 
-// Lap Detection (RSSI-basierte Hysterese)
-#define LAP_RSSI_NEAR -65          // dBm - Beacon ist NAH (Ziellinie)
-#define LAP_RSSI_FAR -80           // dBm - Beacon ist WEG (weggefahren)
+// Lap Detection (RSSI-basierte Hysterese) - Defaults
+#define DEFAULT_LAP_RSSI_NEAR -65  // dBm - Beacon ist NAH (Ziellinie)
+#define DEFAULT_LAP_RSSI_FAR -80   // dBm - Beacon ist WEG (weggefahren)
+#define MIN_RSSI -100              // dBm - Minimum
+#define MAX_RSSI -30               // dBm - Maximum
 
 // Touch
 #define TOUCH_DEBOUNCE 200         // ms
@@ -59,10 +61,10 @@
 #define MAX_TEAMS 20
 #define MAX_RACE_DURATION 7200000  // ms (2 hours)
 
-// UI
-#define BUTTON_HEIGHT 50
-#define BUTTON_MARGIN 10
-#define LIST_ITEM_HEIGHT 40
+// UI (optimiert für 320x240 Display)
+#define BUTTON_HEIGHT 42
+#define BUTTON_MARGIN 8
+#define LIST_ITEM_HEIGHT 38
 #define HEADER_HEIGHT 30
 
 // Colors

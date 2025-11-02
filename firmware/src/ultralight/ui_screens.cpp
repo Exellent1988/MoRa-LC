@@ -19,7 +19,7 @@ void drawHomeScreen() {
     tft.fillScreen(BACKGROUND_COLOR);
     drawHeader(DEVICE_NAME, false);
     
-    int y = HEADER_HEIGHT + 20;
+    int y = HEADER_HEIGHT + 12;
     int btnWidth = SCREEN_WIDTH - 2 * BUTTON_MARGIN;
     
     // Button: Neues Rennen
@@ -37,14 +37,14 @@ void drawHomeScreen() {
     // Button: Einstellungen
     drawButton(BUTTON_MARGIN, y, btnWidth, BUTTON_HEIGHT, "Einstellungen");
     
-    // Footer: Status
+    // Footer: Status (kompakt)
     tft.setTextSize(1);
     tft.setTextColor(TFT_DARKGREY);
-    tft.setCursor(10, SCREEN_HEIGHT - 15);
-    tft.printf("Teams: %u | SD: %s | BLE: %s", 
+    tft.setCursor(10, SCREEN_HEIGHT - 12);
+    tft.printf("T:%u SD:%s BLE:%s", 
                lapCounter.getTeamCount(),
-               dataLogger.isReady() ? "OK" : "NO",
-               bleScanner.isScanning() ? "ON" : "OFF");
+               dataLogger.isReady() ? "OK" : "-",
+               bleScanner.isScanning() ? "ON" : "-");
 }
 
 void drawTeamsScreen() {
@@ -65,7 +65,7 @@ void drawTeamsScreen() {
     } else {
         int displayCount = 0;
         for (auto* team : teams) {
-            if (displayCount >= 4) break;  // Max 4 sichtbar
+            if (displayCount >= 3) break;  // Max 3 sichtbar (Platz für Button)
             
             tft.fillRoundRect(10, y, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT, 3, COLOR_BUTTON);
             tft.setTextColor(TFT_BLACK);
@@ -96,7 +96,7 @@ void drawTeamEditScreen() {
     tft.fillScreen(BACKGROUND_COLOR);
     drawHeader("Team bearbeiten", true);
     
-    int y = HEADER_HEIGHT + 20;
+    int y = HEADER_HEIGHT + 15;
     
     // Team Name
     tft.setTextColor(TFT_WHITE);
@@ -104,12 +104,12 @@ void drawTeamEditScreen() {
     tft.setCursor(10, y);
     tft.print("Name:");
     
-    tft.fillRoundRect(10, y + 25, SCREEN_WIDTH - 20, 40, 5, COLOR_BUTTON);
+    tft.fillRoundRect(10, y + 25, SCREEN_WIDTH - 20, 36, 5, COLOR_BUTTON);
     tft.setTextColor(TFT_BLACK);
-    tft.setCursor(15, y + 35);
+    tft.setCursor(15, y + 33);
     tft.print(uiState.editingTeamName.length() > 0 ? uiState.editingTeamName : "Team eingeben");
     
-    y += 80;
+    y += 70;
     
     // Beacon Assignment
     tft.setTextColor(TFT_WHITE);
@@ -122,9 +122,9 @@ void drawTeamEditScreen() {
         beaconText = team->beaconUUID.substring(0, 12) + "...";
     }
     
-    drawButton(10, y + 25, SCREEN_WIDTH - 20, 40, beaconText);
+    drawButton(10, y + 25, SCREEN_WIDTH - 20, 36, beaconText);
     
-    y += 80;
+    y += 70;
     
     // Buttons
     drawButton(10, y, (SCREEN_WIDTH - 30) / 2, BUTTON_HEIGHT, "Speichern", COLOR_SECONDARY);
@@ -161,7 +161,8 @@ void drawTeamBeaconAssignScreen() {
         
         tft.setTextSize(1);
         tft.setCursor(15, y + 20);
-        tft.printf("UUID: %.12s...", nearest->uuid.c_str());
+        // IMMER MAC-Adresse anzeigen (für Konsistenz)
+        tft.printf("MAC: %s", nearest->macAddress.c_str());
         tft.setCursor(15, y + 35);
         tft.printf("RSSI: %d dBm | %.2fm", nearest->rssi, dist);
         
@@ -213,7 +214,7 @@ void drawBeaconListScreen() {
     // Debug: Log beacon count
     Serial.printf("[UI] drawBeaconListScreen: %u beacons from scanner\n", beacons.size());
     for (auto& b : beacons) {
-        Serial.printf("[UI]   - %s: RSSI=%d\n", b.uuid.c_str(), b.rssi);
+        Serial.printf("[UI]   - MAC=%s UUID=%s: RSSI=%d\n", b.macAddress.c_str(), b.uuid.c_str(), b.rssi);
     }
     
     // Sort by RSSI (strongest first)
@@ -252,7 +253,8 @@ void drawBeaconListScreen() {
                 break;
             }
             
-            Serial.printf("[UI] Drawing beacon #%d: %s (RSSI=%d) at y=%d\n", displayCount, beacon.uuid.c_str(), beacon.rssi, y);
+            Serial.printf("[UI] Drawing beacon #%d: MAC=%s UUID=%s (RSSI=%d) at y=%d\n", 
+                         displayCount, beacon.macAddress.c_str(), beacon.uuid.c_str(), beacon.rssi, y);
             
             float dist = BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower);
             
@@ -262,22 +264,24 @@ void drawBeaconListScreen() {
             tft.setTextSize(1);
             tft.setCursor(15, y + 3);
             
-            // Show MAC address (or UUID) - kompakter
+            // IMMER MAC-Adresse anzeigen (für Zuordnung!)
+            tft.setTextColor(TFT_BLACK);
+            tft.printf("%s", beacon.macAddress.c_str());
+            
+            // Optional: iBeacon Indicator
             if (beacon.uuid.length() > 30) {
-                // iBeacon UUID (kurz anzeigen)
-                tft.printf("iB: %.8s..", beacon.uuid.c_str());
-            } else {
-                // MAC address
-                tft.printf("%s", beacon.uuid.c_str());
+                tft.setTextColor(TFT_DARKGREY);
+                tft.printf(" (iBeacon)");
             }
             
-            tft.setCursor(15, y + 14);
+            tft.setTextColor(TFT_BLACK);
+            tft.setCursor(15, y + 13);
             tft.printf("%d dBm | %.2fm", beacon.rssi, dist);
             
-            tft.setCursor(15, y + 24);
+            tft.setCursor(15, y + 23);
             if (dist < 1.0) {
                 tft.setTextColor(TFT_DARKGREEN);
-                tft.print("< Tippen!");
+                tft.print("< Tippen zum Zuordnen!");
             } else {
                 tft.setTextColor(TFT_DARKGREY);
                 tft.print("zu weit");
@@ -550,39 +554,96 @@ void drawSettingsScreen() {
     tft.fillScreen(BACKGROUND_COLOR);
     drawHeader("Einstellungen", true);
     
-    int y = HEADER_HEIGHT + 20;
+    int y = HEADER_HEIGHT + 8;
     
-    // BLE Settings
+    // === RSSI Thresholds (wichtigste Einstellung!) ===
     tft.setTextColor(TFT_WHITE);
+    tft.setTextSize(1);
+    tft.setCursor(10, y);
+    tft.print("LAP DETECTION (On-the-fly!):");
+    
+    y += 15;
+    
+    // RSSI NEAR (NAH)
+    tft.setTextColor(TFT_LIGHTGREY);
+    tft.setCursor(10, y);
+    tft.print("NAH (Ziellinie):");
+    
+    int btnW = 35;
+    int valW = 60;
+    int xVal = 130;
+    
+    // "-" Button
+    drawButton(xVal - btnW - 5, y - 3, btnW, 28, "-", COLOR_BUTTON);
+    
+    // Value Display
+    tft.fillRoundRect(xVal, y - 3, valW, 28, 3, COLOR_SECONDARY);
+    tft.setTextColor(TFT_BLACK);
     tft.setTextSize(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(String(lapRssiNear), xVal + valW/2, y + 11);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    
+    // "+" Button
+    drawButton(xVal + valW + 5, y - 3, btnW, 28, "+", COLOR_BUTTON);
+    
+    y += 33;
+    
+    // RSSI FAR (WEG)
+    tft.setTextColor(TFT_LIGHTGREY);
+    tft.setCursor(10, y);
+    tft.print("WEG (weggefahren):");
+    
+    // "-" Button
+    drawButton(xVal - btnW - 5, y - 3, btnW, 28, "-", COLOR_BUTTON);
+    
+    // Value Display
+    tft.fillRoundRect(xVal, y - 3, valW, 28, 3, COLOR_SECONDARY);
+    tft.setTextColor(TFT_BLACK);
+    tft.setTextSize(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString(String(lapRssiFar), xVal + valW/2, y + 11);
+    tft.setTextSize(1);
+    tft.setTextDatum(TL_DATUM);
+    
+    // "+" Button
+    drawButton(xVal + valW + 5, y - 3, btnW, 28, "+", COLOR_BUTTON);
+    
+    y += 38;
+    
+    // Separator
+    tft.drawLine(10, y, SCREEN_WIDTH - 10, y, TFT_DARKGREY);
+    y += 8;
+    
+    // === BLE Scanner ===
+    tft.setTextColor(TFT_LIGHTGREY);
     tft.setCursor(10, y);
     tft.print("BLE Scanner:");
     
-    y += 30;
-    drawButton(10, y, SCREEN_WIDTH - 20, 40, 
-              bleScanner.isScanning() ? "Aktiv" : "Inaktiv",
-              bleScanner.isScanning() ? COLOR_SECONDARY : COLOR_BUTTON);
+    tft.fillCircle(120, y + 4, 4, bleScanner.isScanning() ? COLOR_SECONDARY : TFT_DARKGREY);
+    tft.setTextColor(TFT_WHITE);
+    tft.setCursor(130, y);
+    tft.print(bleScanner.isScanning() ? "Aktiv" : "Inaktiv");
     
-    y += 60;
+    y += 18;
     
-    // SD Card
+    // === SD Card ===
+    tft.setTextColor(TFT_LIGHTGREY);
     tft.setCursor(10, y);
     tft.print("SD-Karte:");
     
-    y += 30;
-    String sdStatus = dataLogger.isReady() ? "Bereit" : "Nicht verfugbar";
-    drawButton(10, y, SCREEN_WIDTH - 20, 40, sdStatus,
-              dataLogger.isReady() ? COLOR_SECONDARY : COLOR_DANGER);
+    tft.fillCircle(120, y + 4, 4, dataLogger.isReady() ? COLOR_SECONDARY : COLOR_DANGER);
+    tft.setTextColor(TFT_WHITE);
+    tft.setCursor(130, y);
+    tft.print(dataLogger.isReady() ? "Bereit" : "Nicht verf.");
     
-    y += 60;
+    y += 18;
     
-    // Info
-    tft.setTextSize(1);
+    // === Info ===
     tft.setTextColor(TFT_DARKGREY);
     tft.setCursor(10, y);
-    tft.printf("Version: %s", VERSION);
-    tft.setCursor(10, y + 15);
-    tft.printf("Freier RAM: %u KB", ESP.getFreeHeap() / 1024);
+    tft.printf("Version: %s | RAM: %u KB", VERSION, ESP.getFreeHeap() / 1024);
 }
 
 // ============================================================

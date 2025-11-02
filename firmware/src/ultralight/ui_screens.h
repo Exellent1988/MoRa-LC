@@ -17,6 +17,8 @@
 extern TFT_eSPI tft;
 extern BLEScanner bleScanner;
 extern LapCounter lapCounter;
+extern int8_t lapRssiNear;
+extern int8_t lapRssiFar;
 
 // Screen States
 enum Screen {
@@ -87,6 +89,7 @@ void handleRaceSetupTouch(uint16_t x, uint16_t y);
 void handleRaceRunningTouch(uint16_t x, uint16_t y);
 void handleRacePausedTouch(uint16_t x, uint16_t y);
 void handleRaceResultsTouch(uint16_t x, uint16_t y);
+void handleSettingsTouch(uint16_t x, uint16_t y);
 
 // Helper Functions
 void drawHeader(const String& title, bool showBack = false);

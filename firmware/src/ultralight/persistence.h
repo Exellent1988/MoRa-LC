@@ -29,6 +29,10 @@ public:
     bool saveConfig(const String& raceName, uint32_t raceDuration);
     bool loadConfig(String& raceName, uint32_t& raceDuration);
     
+    // RSSI Thresholds
+    bool saveRssiThresholds(int8_t rssiNear, int8_t rssiFar);
+    bool loadRssiThresholds(int8_t& rssiNear, int8_t& rssiFar);
+    
     // Stats
     uint8_t getTeamCount();
     bool isInitialized();
@@ -46,6 +50,8 @@ private:
     static const char* KEY_TEAM_BEACON;
     static const char* KEY_RACE_NAME;
     static const char* KEY_RACE_DURATION;
+    static const char* KEY_RSSI_NEAR;
+    static const char* KEY_RSSI_FAR;
 };
 
 #endif // PERSISTENCE_H
