@@ -261,11 +261,12 @@ void loop() {
     }
     
     // BLE scanning - start continuous scan if not already scanning (only when needed)
+    // CRITICAL: Only start scanning when actually needed (beacon assignment or race running)
+    // NOT during race setup - this was causing the system to freeze
     if (!raceRunning && !bleScanner.isScanning()) {
-        // Only scan when in beacon assignment or race setup
+        // Only scan when in beacon assignment screens (not race setup!)
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
-            uiState.currentScreen == SCREEN_BEACON_LIST ||
-            uiState.currentScreen == SCREEN_RACE_SETUP) {
+            uiState.currentScreen == SCREEN_BEACON_LIST) {
             // Re-disable logging before starting scan
             esp_log_level_set("*", ESP_LOG_NONE);
             esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
@@ -276,6 +277,14 @@ void loop() {
         esp_log_level_set("*", ESP_LOG_NONE);
         esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
         bleScanner.startScan(0);
+    }
+    
+    // Stop scanning when leaving beacon assignment screens
+    if (bleScanner.isScanning() && !raceRunning) {
+        if (uiState.currentScreen != SCREEN_TEAM_BEACON_ASSIGN && 
+            uiState.currentScreen != SCREEN_BEACON_LIST) {
+            bleScanner.stopScan();
+        }
     }
     
     // Periodically re-disable logging (NimBLE might reset it)
