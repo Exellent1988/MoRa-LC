@@ -560,55 +560,61 @@ void drawSettingsScreen() {
     tft.setTextColor(TFT_WHITE);
     tft.setTextSize(1);
     tft.setCursor(10, y);
-    tft.print("LAP DETECTION (On-the-fly!):");
+    tft.print("LAP DETECTION:");
     
-    y += 15;
+    y += 12;
     
     // RSSI NEAR (NAH)
     tft.setTextColor(TFT_LIGHTGREY);
     tft.setCursor(10, y);
-    tft.print("NAH (Ziellinie):");
+    tft.print("NAH:");
     
-    int btnW = 35;
-    int valW = 60;
-    int xVal = 130;
+    y += 10;  // Label drüber, dann Controls
+    
+    int btnW = 40;
+    int valW = 70;
+    int centerX = SCREEN_WIDTH / 2;
+    int totalW = btnW + 5 + valW + 5 + btnW;
+    int startX = centerX - totalW / 2;
     
     // "-" Button
-    drawButton(xVal - btnW - 5, y - 3, btnW, 28, "-", COLOR_BUTTON);
+    drawButton(startX, y, btnW, 30, "-", COLOR_BUTTON);
     
     // Value Display
-    tft.fillRoundRect(xVal, y - 3, valW, 28, 3, COLOR_SECONDARY);
+    tft.fillRoundRect(startX + btnW + 5, y, valW, 30, 3, COLOR_SECONDARY);
     tft.setTextColor(TFT_BLACK);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(String(lapRssiNear), xVal + valW/2, y + 11);
+    tft.drawString(String(lapRssiNear), startX + btnW + 5 + valW/2, y + 15);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
     
     // "+" Button
-    drawButton(xVal + valW + 5, y - 3, btnW, 28, "+", COLOR_BUTTON);
+    drawButton(startX + btnW + 5 + valW + 5, y, btnW, 30, "+", COLOR_BUTTON);
     
-    y += 33;
+    y += 38;
     
     // RSSI FAR (WEG)
     tft.setTextColor(TFT_LIGHTGREY);
     tft.setCursor(10, y);
-    tft.print("WEG (weggefahren):");
+    tft.print("WEG:");
+    
+    y += 10;  // Label drüber, dann Controls
     
     // "-" Button
-    drawButton(xVal - btnW - 5, y - 3, btnW, 28, "-", COLOR_BUTTON);
+    drawButton(startX, y, btnW, 30, "-", COLOR_BUTTON);
     
     // Value Display
-    tft.fillRoundRect(xVal, y - 3, valW, 28, 3, COLOR_SECONDARY);
+    tft.fillRoundRect(startX + btnW + 5, y, valW, 30, 3, COLOR_SECONDARY);
     tft.setTextColor(TFT_BLACK);
     tft.setTextSize(2);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(String(lapRssiFar), xVal + valW/2, y + 11);
+    tft.drawString(String(lapRssiFar), startX + btnW + 5 + valW/2, y + 15);
     tft.setTextSize(1);
     tft.setTextDatum(TL_DATUM);
     
     // "+" Button
-    drawButton(xVal + valW + 5, y - 3, btnW, 28, "+", COLOR_BUTTON);
+    drawButton(startX + btnW + 5 + valW + 5, y, btnW, 30, "+", COLOR_BUTTON);
     
     y += 38;
     
@@ -619,31 +625,29 @@ void drawSettingsScreen() {
     // === BLE Scanner ===
     tft.setTextColor(TFT_LIGHTGREY);
     tft.setCursor(10, y);
-    tft.print("BLE Scanner:");
+    tft.print("BLE:");
     
-    tft.fillCircle(120, y + 4, 4, bleScanner.isScanning() ? COLOR_SECONDARY : TFT_DARKGREY);
+    tft.fillCircle(50, y + 4, 3, bleScanner.isScanning() ? COLOR_SECONDARY : TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE);
-    tft.setCursor(130, y);
-    tft.print(bleScanner.isScanning() ? "Aktiv" : "Inaktiv");
+    tft.setCursor(58, y);
+    tft.print(bleScanner.isScanning() ? "Aktiv" : "Aus");
     
-    y += 18;
-    
-    // === SD Card ===
+    // SD Card (same line)
     tft.setTextColor(TFT_LIGHTGREY);
-    tft.setCursor(10, y);
-    tft.print("SD-Karte:");
+    tft.setCursor(140, y);
+    tft.print("SD:");
     
-    tft.fillCircle(120, y + 4, 4, dataLogger.isReady() ? COLOR_SECONDARY : COLOR_DANGER);
+    tft.fillCircle(165, y + 4, 3, dataLogger.isReady() ? COLOR_SECONDARY : COLOR_DANGER);
     tft.setTextColor(TFT_WHITE);
-    tft.setCursor(130, y);
-    tft.print(dataLogger.isReady() ? "Bereit" : "Nicht verf.");
+    tft.setCursor(173, y);
+    tft.print(dataLogger.isReady() ? "OK" : "NO");
     
-    y += 18;
+    y += 15;
     
     // === Info ===
     tft.setTextColor(TFT_DARKGREY);
     tft.setCursor(10, y);
-    tft.printf("Version: %s | RAM: %u KB", VERSION, ESP.getFreeHeap() / 1024);
+    tft.printf("v%s | RAM: %uK", VERSION, ESP.getFreeHeap() / 1024);
 }
 
 // ============================================================

@@ -569,16 +569,18 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    int yStart = HEADER_HEIGHT + 8 + 15;
-    int btnW = 35;
-    int valW = 60;
-    int xVal = 130;
+    int yStart = HEADER_HEIGHT + 8 + 12 + 10;  // Title + "NAH:" label
+    int btnW = 40;
+    int valW = 70;
+    int centerX = SCREEN_WIDTH / 2;
+    int totalW = btnW + 5 + valW + 5 + btnW;
+    int startX = centerX - totalW / 2;
     
     // === RSSI NEAR Controls ===
     int yNear = yStart;
     
     // "-" Button (NEAR)
-    if (isTouchInRect(x, y, xVal - btnW - 5, yNear - 3, btnW, 28)) {
+    if (isTouchInRect(x, y, startX, yNear, btnW, 30)) {
         if (lapRssiNear > MIN_RSSI) {
             lapRssiNear -= 5;
             
@@ -594,7 +596,7 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
     }
     
     // "+" Button (NEAR)
-    if (isTouchInRect(x, y, xVal + valW + 5, yNear - 3, btnW, 28)) {
+    if (isTouchInRect(x, y, startX + btnW + 5 + valW + 5, yNear, btnW, 30)) {
         if (lapRssiNear < MAX_RSSI) {
             lapRssiNear += 5;
             
@@ -610,10 +612,10 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
     }
     
     // === RSSI FAR Controls ===
-    int yFar = yStart + 33;
+    int yFar = yStart + 38 + 10;  // NEAR controls + "WEG:" label
     
     // "-" Button (FAR)
-    if (isTouchInRect(x, y, xVal - btnW - 5, yFar - 3, btnW, 28)) {
+    if (isTouchInRect(x, y, startX, yFar, btnW, 30)) {
         if (lapRssiFar > MIN_RSSI) {
             lapRssiFar -= 5;
             
@@ -629,7 +631,7 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
     }
     
     // "+" Button (FAR)
-    if (isTouchInRect(x, y, xVal + valW + 5, yFar - 3, btnW, 28)) {
+    if (isTouchInRect(x, y, startX + btnW + 5 + valW + 5, yFar, btnW, 30)) {
         if (lapRssiFar < MAX_RSSI) {
             lapRssiFar += 5;
             
