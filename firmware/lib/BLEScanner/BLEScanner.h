@@ -6,6 +6,11 @@
 #include <vector>
 #include <map>
 
+// Forward declarations to avoid circular includes
+class NimBLEScan;
+class NimBLEAdvertisedDeviceCallbacks;
+class NimBLEAdvertisedDevice;
+
 /**
  * BLE Scanner für iBeacon Erkennung
  * 
@@ -69,19 +74,13 @@ private:
     int8_t rssiThreshold;
     bool scanning;
     
-    // Internal callback
-    class AdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
-    public:
-        AdvertisedDeviceCallbacks(BLEScanner* scanner) : scanner(scanner) {}
-        void onResult(const NimBLEAdvertisedDevice* advertisedDevice) override;
-    private:
-        BLEScanner* scanner;
-    };
+    // Internal callback - forward declare to avoid include issues
+    class AdvertisedDeviceCallbacks;
     
     AdvertisedDeviceCallbacks* callbacks;
     
     // Helper
-    bool parseIBeacon(const NimBLEAdvertisedDevice* device, BeaconData& beacon);
+    bool parseIBeacon(NimBLEAdvertisedDevice* device, BeaconData& beacon);
 };
 
 #endif // BLE_SCANNER_H

@@ -1,5 +1,36 @@
 #include "BLEScanner.h"
+#include <NimBLEScan.h>
+#include <NimBLEAdvertisedDevice.h>
+#include <NimBLEDevice.h>
 #include <cmath>
+#include "esp_log.h"
+
+// Completely disable ESP-IDF logging for NimBLE
+// Note: ESP_LOG macros are defined in esp_log.h and called from NimBLE library
+// We can't override them here, but we can set log level via build flags
+// The actual "I NimBLEScan: Updated advertiser" messages come from ESP-IDF logging
+
+// Disable NimBLE internal logging completely
+#ifndef CONFIG_NIMBLE_CPP_LOG_LEVEL
+#define CONFIG_NIMBLE_CPP_LOG_LEVEL 0
+#endif
+
+// ============================================================
+// Internal Callbacks - Defined here before use
+// ============================================================
+
+class BLEScanner::AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
+public:
+    AdvertisedDeviceCallbacks(BLEScanner* scanner) : scanner(scanner) {}
+    void onResult(NimBLEAdvertisedDevice* advertisedDevice);
+
+private:
+    BLEScanner* scanner;
+};
+
+// ============================================================
+// BLEScanner Implementation
+// ============================================================
 
 BLEScanner::BLEScanner() 
     : pBLEScan(nullptr)
@@ -19,7 +50,20 @@ BLEScanner::~BLEScanner() {
 bool BLEScanner::begin() {
     Serial.println("[BLE] Initializing...");
     
+    // CRITICAL: Disable ESP-IDF logging BEFORE NimBLE init
+    // This must be called every time before BLE operations
+    esp_log_level_set("*", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("BLE", ESP_LOG_NONE);
+    esp_log_level_set("BT", ESP_LOG_NONE);
+    esp_log_level_set("BTDM", ESP_LOG_NONE);
+    esp_log_level_set("BT_HCI", ESP_LOG_NONE);
+    
+    // Disable NimBLE internal logging to reduce spam
     NimBLEDevice::init("");
+    NimBLEDevice::setPower(ESP_PWR_LVL_P9);  // Maximum power for better range
+    
     pBLEScan = NimBLEDevice::getScan();
     
     if (!pBLEScan) {
@@ -28,7 +72,7 @@ bool BLEScanner::begin() {
     }
     
     callbacks = new AdvertisedDeviceCallbacks(this);
-    pBLEScan->setScanCallbacks(callbacks);
+    pBLEScan->setAdvertisedDeviceCallbacks(callbacks, false);  // false = wantDuplicates
     
     pBLEScan->setActiveScan(true);   // Active scan für bessere Erkennung
     pBLEScan->setInterval(100);      // ms
@@ -36,7 +80,6 @@ bool BLEScanner::begin() {
     pBLEScan->setDuplicateFilter(false);  // Auch Duplicates melden!
     
     Serial.println("[BLE] Initialized successfully");
-    Serial.println("[BLE] Duplicate filter disabled - will report all beacons");
     return true;
 }
 
@@ -46,11 +89,31 @@ void BLEScanner::startScan(uint32_t duration) {
         return;
     }
     
+    // CRITICAL: Disable ESP-IDF logging BEFORE starting scan
+    // NimBLE resets log levels when scanning, so we need to set them again
+    esp_log_level_set("*", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("BLE", ESP_LOG_NONE);
+    esp_log_level_set("BT", ESP_LOG_NONE);
+    esp_log_level_set("BTDM", ESP_LOG_NONE);
+    esp_log_level_set("BT_HCI", ESP_LOG_NONE);
+    
     Serial.printf("[BLE] Starting scan (duration: %u ms)\n", duration);
     scanning = true;
     
     // duration = 0 bedeutet kontinuierlich
     pBLEScan->start(duration / 1000, false);
+    
+    // Set log levels again AFTER start (in case NimBLE reset them)
+    delay(10);  // Small delay to let scan initialize
+    esp_log_level_set("*", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("BLE", ESP_LOG_NONE);
+    esp_log_level_set("BT", ESP_LOG_NONE);
+    esp_log_level_set("BTDM", ESP_LOG_NONE);
+    esp_log_level_set("BT_HCI", ESP_LOG_NONE);
 }
 
 void BLEScanner::stopScan() {
@@ -140,10 +203,17 @@ float BLEScanner::rssiToDistance(int8_t rssi, int8_t txPower) {
 }
 
 // ============================================================
-// Internal Callbacks
+// Internal Callbacks Implementation
 // ============================================================
 
-void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevice* advertisedDevice) {
+void BLEScanner::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
+    // CRITICAL: Disable logging in callback (called very frequently during scanning)
+    // NimBLE might enable logging again, so we disable it on every callback
+    esp_log_level_set("*", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("BLE", ESP_LOG_NONE);
+    
     BeaconData beacon;
     
     // MAC-Adresse immer speichern
@@ -167,21 +237,15 @@ void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevic
         beacon.rssi = advertisedDevice->getRSSI();
         beacon.lastSeen = millis();
         
-        Serial.printf("[BLE] Tracking-Beacon: %s (RSSI: %d dBm)\n", 
-                     beacon.uuid.c_str(), beacon.rssi);
+        // Silent logging - only store, don't spam serial
     } else {
-        Serial.printf("[BLE] iBeacon: MAC=%s, UUID=%s (RSSI: %d dBm)\n", 
-                     beacon.macAddress.c_str(), beacon.uuid.c_str(), beacon.rssi);
+        // iBeacon parsed successfully - no logging spam
     }
     
-    // RSSI Filter (more lenient for testing)
-    Serial.printf("[BLE] Checking RSSI: %d vs threshold %d\n", beacon.rssi, scanner->rssiThreshold);
+    // RSSI Filter
     if (beacon.rssi < scanner->rssiThreshold) {
-        Serial.printf("[BLE] ❌ Filtered out: RSSI %d < threshold %d\n", 
-                     beacon.rssi, scanner->rssiThreshold);
-        return;
+        return;  // Silently filter - no logging spam
     }
-    Serial.println("[BLE] ✓ RSSI OK");
     
     // Update beacon data (Key = MAC-Adresse!)
     String key = beacon.macAddress;
@@ -195,12 +259,10 @@ void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevic
     scanner->beacons[key] = beacon;
     scanner->beacons[key].wasPresent = true;  // Jetzt ist er da
     
-    Serial.printf("[BLE] ✅ Beacon stored! Total beacons: %u\n", scanner->beacons.size());
-    
+    // Only log new beacons to reduce spam
     if (isNew) {
-        Serial.printf("[BLE] New beacon: MAC=%s, RSSI=%d dBm, Dist=%.2fm\n",
-                     beacon.macAddress.c_str(), beacon.rssi,
-                     BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower));
+        Serial.printf("[BLE] New beacon: MAC=%s, RSSI=%d dBm\n",
+                     beacon.macAddress.c_str(), beacon.rssi);
     }
     
     // Callback IMMER aufrufen (auch für Updates!)
@@ -209,7 +271,7 @@ void BLEScanner::AdvertisedDeviceCallbacks::onResult(const NimBLEAdvertisedDevic
     }
 }
 
-bool BLEScanner::parseIBeacon(const NimBLEAdvertisedDevice* device, BeaconData& beacon) {
+bool BLEScanner::parseIBeacon(NimBLEAdvertisedDevice* device, BeaconData& beacon) {
     // iBeacon Format:
     // 0x4C 0x00 (Apple Company ID)
     // 0x02 0x15 (iBeacon Type & Length)
