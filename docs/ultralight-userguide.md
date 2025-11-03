@@ -54,15 +54,22 @@ Home → "Teams verwalten" → "+ Neues Team"
 
 Für jedes Team:
 1. Team-Name eingeben (z.B. "Blitz-Mofas")
+   - Das **On-Screen Keyboard** erscheint automatisch
+   - Tippe die Zeichen auf der Tastatur
+   - "<" löscht das letzte Zeichen
+   - "OK" oder ">" beendet die Eingabe
 2. "Beacon zuordnen" antippen
 3. **Methode 1 (empfohlen):** 
    - Mofa mit Beacon direkt vor Display halten (<1m)
    - Warten bis "Nächster Beacon" angezeigt wird
    - "Diesen Beacon zuordnen" antippen
-4. **Methode 2:**
-   - Alle Beacons eingeschaltet lassen
-   - Beacon aus Liste auswählen
+4. **Methode 2 (Beacon-Liste):**
+   - "Beacon-Liste anzeigen" antippen
+   - Liste zeigt alle gefundenen Beacons mit MAC-Adresse und Distanz
+   - Tippe auf einen Beacon zum Zuordnen (nur wenn <1m entfernt)
 5. "Speichern"
+
+💡 **Hinweis:** Teams werden automatisch gespeichert und bleiben nach Neustart erhalten (Persistenz via NVS)!
 
 **Tipp:** Teams können auch während einem Rennen verwaltet werden!
 
@@ -73,8 +80,13 @@ Home → "Neues Rennen"
 ```
 
 1. **Name:** Rennen-Name eingeben (z.B. "Mofa-Cup Lauf 1")
-2. **Dauer:** Minuten einstellen (Standard: 60 Min)
-3. **Teams:** Automatisch alle angelegten Teams
+   - On-Screen Keyboard erscheint automatisch
+2. **Dauer:** Minuten einstellen
+   - Schnell: Buttons "-5", "+5", "+15" verwenden
+   - Oder: Auf Zeit-Anzeige tippen → **Number Picker** öffnet sich
+   - Im Number Picker: Buttons "-10", "-1", "+1", "+10" verwenden
+   - "OK" bestätigt, "Cancel" bricht ab
+3. **Teams:** Automatisch alle angelegten Teams (Checkboxen zum Auswählen)
 4. **"Rennen starten"**
 
 ## Während des Rennens
@@ -277,13 +289,17 @@ cp /SD/races/*.csv ~/mora-backup/
 
 ## Weiterentwicklung
 
-Geplante Features:
-- On-Screen Tastatur (Text-Eingabe)
-- Zahlen-Picker (Dauer-Eingabe)
-- Beacon-Liste (Methode 2)
+✅ **Bereits implementiert:**
+- ✅ On-Screen Keyboard (Text-Eingabe)
+- ✅ Number Picker (Dauer-Eingabe)
+- ✅ Beacon-Liste (Methode 2)
+- ✅ Persistenz (Teams bleiben nach Neustart erhalten)
+
+**Geplante Features:**
 - WiFi Export (CSV Download)
 - Zweites Display (Zuschauer-Anzeige)
 - Strafen-System (Runden abziehen)
+- Scroll-Funktion für lange Listen (Teams, Beacons)
 
 ## Support
 

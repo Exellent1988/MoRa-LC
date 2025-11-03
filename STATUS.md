@@ -1,6 +1,6 @@
 # MoRa-LC - Implementierungs-Status
 
-**Letztes Update:** UltraLight komplett fertig  
+**Letztes Update:** UltraLight komplett fertig, Dokumentation aktualisiert  
 **Version:** 0.1.0 (Prototyp)
 
 ## ✅ Komplett fertig
@@ -23,6 +23,10 @@
 - ✅ **BLE Scanner** - Beacon-Erkennung, RSSI-Proximity
 - ✅ **Lap Counter** - Automatische Rundenzählung
 - ✅ **Data Logger** - SD-Karte CSV Export
+- ✅ **On-Screen Keyboard** - Vollständige Text-Eingabe
+- ✅ **Number Picker** - Zahlen-Eingabe für Dauer/Einstellungen
+- ✅ **Persistenz** - Teams bleiben nach Neustart erhalten (NVS)
+- ✅ **Beacon-Liste Screen** - Auswahl aus Liste (Methode 2)
 - ✅ **Dokumentation** - User-Guide komplett
 
 **Status:** Ready für Hardware-Test! 🎉
@@ -72,8 +76,10 @@
 - ❌ Integration Tests
 
 ### Optional/Später
-- ❌ On-Screen Keyboard (UltraLight)
-- ❌ Number Picker (UltraLight)
+- ✅ On-Screen Keyboard (UltraLight) - Implementiert!
+- ✅ Number Picker (UltraLight) - Implementiert!
+- ✅ Beacon-Liste Screen (UltraLight) - Methode 2 implementiert!
+- ✅ Persistenz (UltraLight) - Teams bleiben nach Neustart erhalten!
 - ❌ GPS Integration (FullBlown)
 - ❌ UWB Integration (FullBlown)
 - ❌ Cloud-Streaming (FullBlown)
@@ -136,14 +142,14 @@ Wenn UltraLight funktioniert → FullBlown Firmware:
 ## 🐛 Bekannte Einschränkungen
 
 ### UltraLight
-1. **Text-Eingabe:** On-Screen Keyboard fehlt noch
-   - Workaround: Standard-Namen verwenden
-2. **Zahlen-Eingabe:** Number Picker fehlt noch
-   - Workaround: 60 Min Standard-Dauer
-3. **Keine Persistenz:** Teams gehen bei Neustart verloren
-   - Lösung: Wäre einfach mit EEPROM/Preferences
-4. **Beacon-Liste:** "Methode 2" noch nicht implementiert
-   - Workaround: RSSI-Proximity (Methode 1) nutzen
+1. ✅ **Text-Eingabe:** On-Screen Keyboard implementiert
+2. ✅ **Zahlen-Eingabe:** Number Picker implementiert
+3. ✅ **Persistenz:** Teams bleiben nach Neustart erhalten (NVS)
+4. ✅ **Beacon-Liste:** Methode 2 (Liste auswählen) implementiert
+5. **Scroll-Funktion:** Teams-Liste zeigt nur 3 Teams (kein Scroll)
+   - Workaround: Teams löschen oder neu anordnen
+6. **Beacon-Anzahl:** Beacon-Liste zeigt max. 8 Beacons
+   - Workaround: Beacons einzeln scannen
 
 ### Shared Libraries
 - BLEScanner: Keine Multi-Beacon gleichzeitig
@@ -182,7 +188,8 @@ Das **komplette UltraLight System** ist implementiert:
 - Mehr Abstraktionen (Button-Class statt manuelle Rects)
 - State-Machine für UI (aktuell switch-case)
 - Touch-Kalibrierung beim ersten Start
-- Persistenz für Teams
+- Scroll-Funktion für lange Listen (Teams, Beacons)
+- Mehrere Beacons gleichzeitig scannen (aktuell: max. 10 gleichzeitig)
 
 **Für FullBlown:**
 - Früher mit Hardware-Tests starten
