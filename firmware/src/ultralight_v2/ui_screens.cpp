@@ -662,7 +662,10 @@ void handleTouch(uint16_t x, uint16_t y) {
     // Back button in header - match exact button dimensions from drawHeader
     // Button is at (5, 5) with size (40, 30)
     // Only check if current screen has a back button (not HOME)
-    if (uiState.currentScreen != SCREEN_HOME) {
+    // EXCEPTION: Screens with explicit back button handlers (TEAMS, RACE_RESULTS)
+    if (uiState.currentScreen != SCREEN_HOME && 
+        uiState.currentScreen != SCREEN_TEAMS && 
+        uiState.currentScreen != SCREEN_RACE_RESULTS) {
         if (isTouchInRect(x, y, 5, 5, 40, 30)) {
             // Stop BLE scanning if on beacon assignment screens
             if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
