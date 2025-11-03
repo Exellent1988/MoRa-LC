@@ -684,6 +684,24 @@ void handleTouch(uint16_t x, uint16_t y) {
         case SCREEN_TEAM_EDIT:
             handleTeamEditTouch(x, y);
             break;
+        case SCREEN_TEAM_BEACON_ASSIGN:
+            handleBeaconAssignTouch(x, y);
+            break;
+        case SCREEN_BEACON_LIST:
+            handleBeaconListTouch(x, y);
+            break;
+        case SCREEN_RACE_SETUP:
+            handleRaceSetupTouch(x, y);
+            break;
+        case SCREEN_RACE_RUNNING:
+            handleRaceRunningTouch(x, y);
+            break;
+        case SCREEN_RACE_PAUSED:
+            handleRacePausedTouch(x, y);
+            break;
+        case SCREEN_RACE_RESULTS:
+            handleRaceResultsTouch(x, y);
+            break;
         case SCREEN_SETTINGS:
             handleSettingsTouch(x, y);
             break;
@@ -843,8 +861,11 @@ void handleTeamEditTouch(uint16_t x, uint16_t y) {
 }
 
 void handleBeaconAssignTouch(uint16_t x, uint16_t y) {
+    Serial.printf("[BeaconAssignTouch] x=%u, y=%u\n", x, y);
+    
     // Back button
     if (isTouchInRect(x, y, 5, 5, 60, HEADER_HEIGHT)) {
+        Serial.println("[BeaconAssign] Back button pressed");
         bleScanner.stopScan();
         uiState.changeScreen(uiState.previousScreen);
         return;
@@ -852,15 +873,28 @@ void handleBeaconAssignTouch(uint16_t x, uint16_t y) {
     
     // Assign nearest beacon button (if visible and close enough)
     BeaconData* nearest = bleScanner.getNearestBeacon();
+    Serial.printf("[BeaconAssign] Nearest beacon: %s\n", nearest ? "FOUND" : "NULL");
+    
     if (nearest) {
         float dist = BLEScanner::rssiToDistance(nearest->rssi, nearest->txPower);
         
+        Serial.printf("[BeaconAssign] MAC=%s, RSSI=%d, dist=%.2fm\n", 
+                     nearest->macAddress.c_str(), nearest->rssi, dist);
+        
         if (dist < 1.0) {
-            int btnY = HEADER_HEIGHT + 107;
+            // CRITICAL: Match exact Y position from drawTeamBeaconAssignScreen!
+            // y = HEADER_HEIGHT + 12 + 35 (instructions) + 65 (boxH) + 12 (spacing)
+            int btnY = HEADER_HEIGHT + 12 + 35 + 65 + 12;  // = 164
             int btnW = (SCREEN_WIDTH - 30) / 2;
+            
+            Serial.printf("[BeaconAssign] Buttons at Y=%d (h=%d), Touch at Y=%u\n", btnY, BUTTON_HEIGHT, y);
+            Serial.printf("[BeaconAssign] Zuordnen: x=10-%d, y=%d-%d\n", 10+btnW, btnY, btnY+BUTTON_HEIGHT);
+            Serial.printf("[BeaconAssign] Liste: x=%d-%d, y=%d-%d\n", 20+btnW, 20+btnW*2, btnY, btnY+BUTTON_HEIGHT);
             
             // "Zuordnen" Button (links)
             if (isTouchInRect(x, y, 10, btnY, btnW, BUTTON_HEIGHT)) {
+                Serial.println("[BeaconAssign] ZUORDNEN BUTTON PRESSED!");
+
                 TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
                 if (team) {
                     bleScanner.stopScan();  // CRITICAL: Stop scan BEFORE showMessage!

@@ -96,9 +96,9 @@ void BLEScanner::startScan(uint32_t duration) {
     scanning = true;
     
     // CRITICAL FIX: Even with "true" (non-blocking), very long durations BLOCK!
-    // Solution: Use short intervals (5 seconds) and restart automatically
-    // Duration 0 = continuous → use 5 second intervals
-    uint32_t scanDuration = (duration == 0) ? 5 : (duration / 1000);
+    // Solution: Use short intervals and restart automatically
+    // Duration 0 = continuous → use 3 second intervals (faster beacon updates)
+    uint32_t scanDuration = (duration == 0) ? 3 : (duration / 1000);
     
     Serial.printf("[BLE] Calling pBLEScan->start(%u, true)...\n", scanDuration);
     pBLEScan->start(scanDuration, true);  // true = non-blocking, restart on completion

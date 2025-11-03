@@ -300,34 +300,19 @@ void loop() {
     // CRITICAL: Must call screen draw functions directly, not just set needsRedraw
     // This prevents the UI from freezing during beacon scanning
     if (bleScanner.isScanning()) {
-        Serial.println("[DEBUG] BLE is scanning...");
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
             uiState.currentScreen == SCREEN_BEACON_LIST) {
-            Serial.println("[DEBUG] On beacon screen, checking refresh timer...");
             static uint32_t lastBeaconRefresh = 0;
-            if (millis() - lastBeaconRefresh > 1000) {  // Refresh every second
-                Serial.printf("[AutoRefresh] Updating screen=%d, beacons=%d\n", 
-                             uiState.currentScreen, bleScanner.getBeacons().size());
-                
+            if (millis() - lastBeaconRefresh > 500) {  // Refresh every 500ms (faster updates!)
                 // Direct screen redraw - EXACTLY like old variant
                 if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN) {
-                    Serial.println("[AutoRefresh] Drawing TEAM_BEACON_ASSIGN...");
                     drawTeamBeaconAssignScreen();
-                    Serial.println("[AutoRefresh] Done!");
                 } else if (uiState.currentScreen == SCREEN_BEACON_LIST) {
-                    Serial.println("[AutoRefresh] Drawing BEACON_LIST...");
                     drawBeaconListScreen();
-                    Serial.println("[AutoRefresh] Done!");
                 }
                 lastBeaconRefresh = millis();
-            } else {
-                Serial.printf("[DEBUG] Waiting for refresh... (elapsed=%lu)\n", millis() - lastBeaconRefresh);
             }
-        } else {
-            Serial.printf("[DEBUG] Not on beacon screen (screen=%d)\n", uiState.currentScreen);
         }
-    } else {
-        Serial.println("[DEBUG] BLE is NOT scanning");
     }
     
     // Clean up old beacons (only every 5 seconds to reduce overhead)

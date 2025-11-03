@@ -44,7 +44,7 @@
 #define BLE_SCAN_INTERVAL 100
 #define BLE_SCAN_WINDOW   99
 #define BLE_RSSI_THRESHOLD -100
-#define BEACON_TIMEOUT    3000
+#define BEACON_TIMEOUT    10000  // 10 Sekunden (vorher 3 Sek - zu kurz!)
 #define BLE_UUID_PREFIX "c3:00:"
 
 // Lap Detection
