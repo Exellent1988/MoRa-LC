@@ -8,7 +8,7 @@
 
 // Forward declarations to avoid circular includes
 class NimBLEScan;
-class NimBLEScanCallbacks;
+class NimBLEAdvertisedDeviceCallbacks;
 class NimBLEAdvertisedDevice;
 
 /**

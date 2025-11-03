@@ -84,3 +84,15 @@ uint32_t inputNumber(const String& prompt, uint32_t defaultValue, uint32_t min, 
     return result;
 }
 
+// Format beacon MAC address: c3:00:00:42:d9:2b -> 42:d9:2b (last 4 digits)
+String formatBeaconMAC(const String& macAddress) {
+    // Check if it's a c3:00:00:XX:XX:XX beacon
+    if (macAddress.startsWith("c3:00:00:")) {
+        // Return only the last 8 characters (XX:XX:XX)
+        if (macAddress.length() >= 8) {
+            return macAddress.substring(macAddress.length() - 8);
+        }
+    }
+    // Otherwise return full MAC
+    return macAddress;
+}

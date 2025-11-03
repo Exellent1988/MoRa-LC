@@ -89,7 +89,7 @@ void drawTeamsScreen() {
             lcd.setTextSize(1);  // Smaller for beacon info
             lcd.setCursor(15, y + 26);
             if (team->beaconUUID.length() > 0) {
-                lcd.printf("Beacon: %.8s...", team->beaconUUID.c_str());
+                lcd.printf("Beacon: %s", formatBeaconMAC(team->beaconUUID).c_str());
             } else {
                 lcd.print("Kein Beacon");
             }
@@ -133,7 +133,7 @@ void drawTeamEditScreen() {
     TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
     String beaconText = "Nicht zugeordnet";
     if (team && team->beaconUUID.length() > 0) {
-        beaconText = team->beaconUUID.substring(0, 12) + "...";
+        beaconText = formatBeaconMAC(team->beaconUUID);
     }
     
     drawButton(10, y + 25, SCREEN_WIDTH - 20, 36, beaconText, COLOR_BUTTON);
@@ -178,7 +178,7 @@ void drawTeamBeaconAssignScreen() {
         lcd.print("Nachster Beacon:");
         
         lcd.setCursor(15, y + 28);
-        lcd.printf("MAC: %s", nearest->macAddress.c_str());
+        lcd.printf("MAC: %s", formatBeaconMAC(nearest->macAddress).c_str());
         lcd.setCursor(15, y + 48);
         lcd.printf("RSSI: %d dBm | %.2fm", nearest->rssi, dist);
         
@@ -264,8 +264,8 @@ void drawBeaconListScreen() {
             lcd.setTextSize(TEXT_SIZE_NORMAL);
             lcd.setCursor(15, y + 6);
             
-            // Always show MAC address
-            lcd.printf("%s", beacon.macAddress.c_str());
+            // Always show MAC address (formatted: only last 4 digits for c3:00:00:XX:XX:XX)
+            lcd.printf("%s", formatBeaconMAC(beacon.macAddress).c_str());
             
             lcd.setCursor(15, y + 22);
             lcd.printf("%d dBm | %.2fm", beacon.rssi, dist);
@@ -793,12 +793,8 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
 }
 
 void handleTeamEditTouch(uint16_t x, uint16_t y) {
-    // Back button - EXPLICIT handler (not global!)
-    // Old variant uses SCREEN_WIDTH-60, drawHeader shows button at right
-    if (isTouchInRect(x, y, SCREEN_WIDTH - 60, 0, 60, HEADER_HEIGHT)) {
-        uiState.changeScreen(SCREEN_TEAMS);
-        return;
-    }
+    // Back button is handled by global handleTouch() at (5, 5, 40, 30)
+    // No need for explicit handler here - global handler returns before reaching this function
     
     int btnY = HEADER_HEIGHT + 15;
     
@@ -817,11 +813,7 @@ void handleTeamEditTouch(uint16_t x, uint16_t y) {
     if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 36)) {
         uiState.previousScreen = SCREEN_TEAM_EDIT;
         uiState.changeScreen(SCREEN_TEAM_BEACON_ASSIGN);
-        
-        // Start BLE scanning
-        if (!bleScanner.isScanning()) {
-            bleScanner.startScan(0);
-        }
+        // BLE scanning will be started automatically by loop()
         return;
     }
     
@@ -871,10 +863,10 @@ void handleBeaconAssignTouch(uint16_t x, uint16_t y) {
             if (isTouchInRect(x, y, 10, btnY, btnW, BUTTON_HEIGHT)) {
                 TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
                 if (team) {
+                    bleScanner.stopScan();  // CRITICAL: Stop scan BEFORE showMessage!
                     team->beaconUUID = nearest->macAddress;
                     persistence.saveTeams(lapCounter);
                     showMessage("Zuordnung", "Beacon zugeordnet", COLOR_SECONDARY);
-                    bleScanner.stopScan();
                     uiState.changeScreen(SCREEN_TEAM_EDIT);
                 }
                 return;
@@ -938,13 +930,15 @@ void handleBeaconListTouch(uint16_t x, uint16_t y) {
                     Serial.printf("[Team %u] Beacon assigned: MAC=%s (UUID=%s)\n", 
                                  uiState.editingTeamId, beacon.macAddress.c_str(), beacon.uuid.c_str());
                     
+                    bleScanner.stopScan();  // CRITICAL: Stop scan BEFORE showMessage!
                     showMessage("Zugeordnet", "Beacon erfolgreich zugeordnet", COLOR_SECONDARY);
-                    bleScanner.stopScan();
                     uiState.changeScreen(SCREEN_TEAM_EDIT);
                     return;
                 }
             } else {
+                // Don't stop scan here - user might try another beacon
                 showMessage("Hinweis", "Beacon zu weit! Naher halten (<1m)", COLOR_WARNING);
+                // Screen will auto-refresh after delay
             }
             return;
         }

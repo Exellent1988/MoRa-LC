@@ -222,16 +222,12 @@ void drawTeamBeaconAssignScreen();
 void drawBeaconListScreen();
 
 void loop() {
-    // Auto-refresh beacon screens while scanning (CRITICAL!)
-    if (bleScanner.isScanning()) {
-        if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
-            uiState.currentScreen == SCREEN_BEACON_LIST) {
-            static uint32_t lastBeaconRefresh = 0;
-            if (millis() - lastBeaconRefresh > 1000) {  // Refresh every second
-                drawScreen();
-                lastBeaconRefresh = millis();
-            }
-        }
+    // DEBUG: Print status every 5 seconds
+    static uint32_t lastDebug = 0;
+    if (millis() - lastDebug > 5000) {
+        Serial.printf("[DEBUG] Screen=%d, Scanning=%d, Beacons=%d\n", 
+                     uiState.currentScreen, bleScanner.isScanning(), bleScanner.getBeacons().size());
+        lastDebug = millis();
     }
     
     // Touch handling
@@ -281,15 +277,11 @@ void loop() {
         // Only scan when in beacon assignment screens (not race setup!)
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
             uiState.currentScreen == SCREEN_BEACON_LIST) {
-            // Re-disable logging before starting scan
-            esp_log_level_set("*", ESP_LOG_NONE);
-            esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+            Serial.printf("[BLE] Auto-starting scan (screen=%d)\n", uiState.currentScreen);
             bleScanner.startScan(0);  // 0 = continuous
         }
     } else if (raceRunning && !bleScanner.isScanning()) {
-        // Re-disable logging before starting scan
-        esp_log_level_set("*", ESP_LOG_NONE);
-        esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+        Serial.println("[BLE] Auto-starting scan (race running)");
         bleScanner.startScan(0);
     }
     
@@ -301,32 +293,41 @@ void loop() {
         }
     }
     
-    // Periodically re-disable logging (NimBLE might reset it)
-    static uint32_t lastLogDisable = 0;
-    if (millis() - lastLogDisable > 5000) {  // Every 5 seconds
-        esp_log_level_set("*", ESP_LOG_NONE);
-        esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
-        esp_log_level_set("NimBLE", ESP_LOG_NONE);
-        lastLogDisable = millis();
-    }
+    // NOTE: Log levels are set once in setup() and should NOT be changed during runtime
+    // Calling esp_log_level_set() here causes blocking and UI freezes!
     
     // Auto-refresh beacon screens while scanning (from old variant - prevents freezing)
     // CRITICAL: Must call screen draw functions directly, not just set needsRedraw
     // This prevents the UI from freezing during beacon scanning
     if (bleScanner.isScanning()) {
+        Serial.println("[DEBUG] BLE is scanning...");
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
             uiState.currentScreen == SCREEN_BEACON_LIST) {
+            Serial.println("[DEBUG] On beacon screen, checking refresh timer...");
             static uint32_t lastBeaconRefresh = 0;
             if (millis() - lastBeaconRefresh > 1000) {  // Refresh every second
+                Serial.printf("[AutoRefresh] Updating screen=%d, beacons=%d\n", 
+                             uiState.currentScreen, bleScanner.getBeacons().size());
+                
                 // Direct screen redraw - EXACTLY like old variant
                 if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN) {
+                    Serial.println("[AutoRefresh] Drawing TEAM_BEACON_ASSIGN...");
                     drawTeamBeaconAssignScreen();
+                    Serial.println("[AutoRefresh] Done!");
                 } else if (uiState.currentScreen == SCREEN_BEACON_LIST) {
+                    Serial.println("[AutoRefresh] Drawing BEACON_LIST...");
                     drawBeaconListScreen();
+                    Serial.println("[AutoRefresh] Done!");
                 }
                 lastBeaconRefresh = millis();
+            } else {
+                Serial.printf("[DEBUG] Waiting for refresh... (elapsed=%lu)\n", millis() - lastBeaconRefresh);
             }
+        } else {
+            Serial.printf("[DEBUG] Not on beacon screen (screen=%d)\n", uiState.currentScreen);
         }
+    } else {
+        Serial.println("[DEBUG] BLE is NOT scanning");
     }
     
     // Clean up old beacons (only every 5 seconds to reduce overhead)
