@@ -53,10 +53,10 @@
 - ❌ Gateway-Firmware (LoRa RX + MQTT + BLE RSSI)
 - ❌ Display-Firmware (WS2812 + LoRa)
 
-**Backend (0%):**
-- ❌ FastAPI Setup
+**Backend (~20%):**
+- ✅ FastAPI Grundgerüst (Teams & Races API)
+- ✅ SQLite Schema + SQLAlchemy Models
 - ❌ MQTT Client & Handler  
-- ❌ SQLite Datenbank
 - ❌ Position Tracker (RSSI Trilateration)
 - ❌ Services (Lap Counter, Crash Detector)
 
