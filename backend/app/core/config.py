@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     mqtt_broker: str = Field("localhost", env="MQTT_BROKER")
     mqtt_port: int = Field(1883, env="MQTT_PORT")
+    mqtt_username: str | None = Field(None, env="MQTT_USERNAME")
+    mqtt_password: str | None = Field(None, env="MQTT_PASSWORD")
+    mqtt_keepalive: int = Field(30, env="MQTT_KEEPALIVE")
+    mqtt_client_id: str | None = Field(None, env="MQTT_CLIENT_ID")
     mqtt_lora_rx_topic: str = Field("mora/lora/rx", env="MQTT_TOPIC_LORA_RX")
     mqtt_lora_tx_topic: str = Field("mora/lora/tx", env="MQTT_TOPIC_LORA_TX")
 
@@ -51,6 +55,14 @@ def _load_yaml_config(payload: Dict[str, Any] | None, base: Settings) -> Setting
             updates["mqtt_broker"] = mqtt["broker"]
         if mqtt.get("port") is not None:
             updates["mqtt_port"] = int(mqtt["port"])
+        if mqtt.get("username"):
+            updates["mqtt_username"] = mqtt["username"]
+        if mqtt.get("password"):
+            updates["mqtt_password"] = mqtt["password"]
+        if mqtt.get("keepalive") is not None:
+            updates["mqtt_keepalive"] = int(mqtt["keepalive"])
+        if mqtt.get("client_id"):
+            updates["mqtt_client_id"] = mqtt["client_id"]
         topics = mqtt.get("topics") or {}
         if isinstance(topics, dict):
             if topics.get("lora_rx"):

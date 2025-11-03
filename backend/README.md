@@ -9,7 +9,8 @@ Python Backend fuer das FullBlown MoRa-LC System.
 - [x] REST-Endpoints fuer Team- und Rennverwaltung (inkl. Statuswechsel)
 - [x] Konfiguration via `.env` oder `config.yaml`
 - [x] Health-Check Endpoint (`/health`)
-- [ ] MQTT-, Telemetrie- und Service-Layer folgen als naechstes
+- [x] MQTT-Client + LoRa Handler (Basisimplementation)
+- [ ] Weiterfuehrende Services (Lap Counter, Position Tracker, Crash Detection)
 
 ## Setup
 
@@ -73,6 +74,10 @@ general:
 mqtt:
   broker: localhost
   port: 1883
+  # username: user
+  # password: pass
+  keepalive: 30
+  client_id: mora-backend
   topics:
     lora_rx: "mora/lora/rx"
     lora_tx: "mora/lora/tx"
@@ -84,6 +89,13 @@ track:
   size_x: 75
   size_y: 75
 ```
+
+## MQTT und LoRa Handler
+
+- Beim Serverstart verbindet sich ein paho-mqtt Client mit dem Broker (`mqtt.broker`, `mqtt.port`).
+- Der LoRa-Handler abonniert `mqtt.topics.lora_rx`, dekodiert JSON-Payloads und bietet Listener-Hooks.
+- Falls keine Verbindung zustande kommt, protokolliert der Server den Fehler, laeuft aber weiter (REST API bleibt erreichbar).
+- Outbound-Kommandos koennen spaeter ueber `mqtt.topics.lora_tx` mit `MQTTClient.publish` verschickt werden.
 
 ## REST API
 
@@ -111,7 +123,7 @@ Alle Rennen liefern verknuepfte Teams als `TeamSummary` zurueck.
 
 ## Naechste Schritte
 
-- MQTT-Client und LoRa-Handler anbinden
+- LoRa-Nachrichten in Domain-Services (Lap Counter, Telemetriepersistenz) weiterverarbeiten
 - Service-Layer (Lap Counter, Position Tracker, Crash Detection) implementieren
 - WebSocket-Streaming der Telemetriedaten
 - Alembic fuer Datenbank-Migrationen konfigurieren

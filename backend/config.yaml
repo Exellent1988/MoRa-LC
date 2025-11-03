@@ -5,6 +5,10 @@ general:
 mqtt:
   broker: localhost
   port: 1883
+  # username: user
+  # password: pass
+  keepalive: 30
+  client_id: mora-backend
   topics:
     lora_rx: "mora/lora/rx"
     lora_tx: "mora/lora/tx"
