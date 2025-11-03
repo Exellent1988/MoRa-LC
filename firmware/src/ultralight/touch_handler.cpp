@@ -297,7 +297,7 @@ void handleBeaconListTouch(uint16_t x, uint16_t y) {
     
     // *** WICHTIG: Gleiche Sortierung wie in drawBeaconListScreen! ***
     std::sort(beacons.begin(), beacons.end(), [](const BeaconData& a, const BeaconData& b) {
-        return a.rssi > b.rssi;  // Höherer RSSI = stärker = näher
+        return a.rssi > b.rssi;  // H?herer RSSI = st?rker = n?her
     });
     
     int y_start = HEADER_HEIGHT + 30;
@@ -402,7 +402,7 @@ void handleRaceSetupTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    // Zeit-Anzeige klicken für manuellen Input
+    // Zeit-Anzeige klicken f?r manuellen Input
     if (isTouchInRect(x, y, 60, btnY, 120, btnSize)) {
         uiState.raceDuration = inputNumber("Dauer (Minuten)", uiState.raceDuration, 1, 180);
         uiState.needsRedraw = true;
@@ -544,20 +544,50 @@ void handleRacePausedTouch(uint16_t x, uint16_t y) {
 void handleRaceResultsTouch(uint16_t x, uint16_t y) {
     // Back button
     if (isTouchInRect(x, y, SCREEN_WIDTH - 60, 0, 60, HEADER_HEIGHT)) {
+        uiState.resultsPage = 0;  // Reset to current race
         uiState.currentScreen = SCREEN_HOME;
         uiState.needsRedraw = true;
         return;
     }
     
-    // SD Card info button (if clicked, show file location)
-    int btnY = SCREEN_HEIGHT - 60;
-    if (dataLogger.isReady()) {
-        if (isTouchInRect(x, y, BUTTON_MARGIN, btnY, SCREEN_WIDTH - 2*BUTTON_MARGIN, BUTTON_HEIGHT)) {
-            String filename = dataLogger.getCurrentRaceFile();
-            if (filename.length() > 0) {
-                showMessage("Gespeichert", filename, COLOR_SECONDARY);
+    // Navigation buttons
+    int btnY = SCREEN_HEIGHT - 50;
+    int btnW = 60;
+    
+    // Previous button
+    if (isTouchInRect(x, y, 10, btnY, btnW, 30)) {
+        if (uiState.resultsPage > 0) {
+            uiState.resultsPage--;
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // Next button
+    if (isTouchInRect(x, y, SCREEN_WIDTH - btnW - 10, btnY, btnW, 30)) {
+        // Check max races
+        String raceFiles = dataLogger.getRaceFileList(10);
+        uint8_t maxRaces = 1;
+        if (raceFiles.length() > 0) {
+            int count = 1;
+            int pos = 0;
+            while ((pos = raceFiles.indexOf('\n', pos)) >= 0) {
+                count++;
+                pos++;
+            }
+            maxRaces = count;
+            if (dataLogger.getCurrentRaceFile().length() == 0) {
+                maxRaces = count;
+            } else {
+                maxRaces = count;
             }
         }
+        
+        if (uiState.resultsPage < maxRaces - 1) {
+            uiState.resultsPage++;
+            uiState.needsRedraw = true;
+        }
+        return;
     }
 }
 
@@ -642,6 +672,73 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
             uiState.needsRedraw = true;
         }
         return;
+    }
+    
+    // === SD Format Button ===
+    if (dataLogger.isReady()) {
+        int yFormat = HEADER_HEIGHT + 8 + 18 + 33 + 38 + 8 + 18 + 18 + 18;
+        if (isTouchInRect(x, y, SCREEN_WIDTH - 110, yFormat - 2, 100, 25)) {
+            // Confirmation dialog
+            tft.fillScreen(BACKGROUND_COLOR);
+            tft.setTextColor(TFT_RED);
+            tft.setTextSize(2);
+            tft.setTextDatum(TC_DATUM);
+            tft.drawString("WARNUNG!", SCREEN_WIDTH / 2, 60);
+            
+            tft.setTextColor(TFT_WHITE);
+            tft.setTextSize(1);
+            tft.setTextDatum(TC_DATUM);
+            tft.drawString("Alle Daten werden", SCREEN_WIDTH / 2, 100);
+            tft.drawString("geloscht!", SCREEN_WIDTH / 2, 115);
+            
+            tft.setTextSize(1);
+            tft.setCursor(10, 140);
+            tft.print("Fortfahren?");
+            
+            // Buttons
+            drawButton(10, 180, 90, 30, "Abbrechen", COLOR_DANGER);
+            drawButton(SCREEN_WIDTH - 100, 180, 90, 30, "Formatieren", COLOR_WARNING);
+            
+            // Wait for confirmation
+            bool confirmed = false;
+            bool cancelled = false;
+            uint32_t waitStart = millis();
+            
+            while (!confirmed && !cancelled && (millis() - waitStart < 30000)) {
+                uint16_t tx, ty;
+                if (getTouchCoordinates(&tx, &ty)) {
+                    delay(50);
+                    while (getTouchCoordinates(&tx, &ty)) delay(10);
+                    
+                    // Cancel button
+                    if (isTouchInRect(tx, ty, 10, 180, 90, 30)) {
+                        cancelled = true;
+                        break;
+                    }
+                    
+                    // Confirm button
+                    if (isTouchInRect(tx, ty, SCREEN_WIDTH - 100, 180, 90, 30)) {
+                        confirmed = true;
+                        break;
+                    }
+                }
+                delay(50);
+            }
+            
+            if (confirmed) {
+                Serial.println("[Settings] Formatting SD card...");
+                if (dataLogger.formatSD()) {
+                    showMessage("Erfolg", "SD-Karte formatiert", COLOR_SECONDARY);
+                    // Reinitialize SD
+                    dataLogger.begin(SD_CS_PIN);
+                } else {
+                    showMessage("Fehler", "Formatierung fehlgeschlagen", COLOR_DANGER);
+                }
+            }
+            
+            uiState.needsRedraw = true;
+            return;
+        }
     }
 }
 

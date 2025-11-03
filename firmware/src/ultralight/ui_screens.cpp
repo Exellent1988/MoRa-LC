@@ -495,58 +495,261 @@ void drawRaceResultsScreen() {
     tft.fillScreen(BACKGROUND_COLOR);
     drawHeader("Ergebnisse", true);
     
-    int y = HEADER_HEIGHT + 10;
+    // Get list of race files
+    String raceFiles = dataLogger.getRaceFileList(10);
     
-    auto leaderboard = lapCounter.getLeaderboard(true);
+    // Parse race files
+    struct RaceFile {
+        String filename;
+        int index;
+    };
+    RaceFile races[4];  // 0 = current, 1-3 = last 3
+    uint8_t raceCount = 0;
     
-    if (leaderboard.empty()) {
-        tft.setTextColor(TFT_DARKGREY);
-        tft.setTextSize(2);
-        tft.setCursor(40, y + 60);
-        tft.print("Keine Daten");
-    } else {
-        int pos = 1;
-        for (auto* team : leaderboard) {
-            if (y > SCREEN_HEIGHT - 100) break;
-            
-            // Medal emoji simulation
-            const char* medal = "";
-            uint16_t medalColor = TFT_WHITE;
-            if (pos == 1) { medal = "1."; medalColor = TFT_GOLD; }
-            else if (pos == 2) { medal = "2."; medalColor = TFT_SILVER; }
-            else if (pos == 3) { medal = "3."; medalColor = 0xCD7F32; }  // Bronze
-            
-            tft.setTextColor(medalColor);
-            tft.setTextSize(2);
-            tft.setCursor(10, y);
-            tft.print(medal);
-            
-            tft.setTextColor(TFT_WHITE);
-            tft.setCursor(40, y);
-            tft.print(team->teamName);
-            
-            tft.setTextSize(1);
-            tft.setCursor(20, y + 18);
-            uint16_t laps = team->lapCount > 0 ? team->lapCount - 1 : 0;
-            tft.printf("%u Runden", laps);
-            
-            if (team->bestLapDuration < UINT32_MAX) {
-                tft.setCursor(120, y + 18);
-                tft.printf("Beste: %lu.%03lu s", 
-                          team->bestLapDuration / 1000, 
-                          team->bestLapDuration % 1000);
-            }
-            
-            y += 38;
-            pos++;
+    // Current race is always index 0
+    if (dataLogger.getCurrentRaceFile().length() > 0) {
+        races[0].filename = dataLogger.getCurrentRaceFile();
+        races[0].index = 0;
+        raceCount = 1;
+    }
+    
+    // Parse historical races from file list
+    int startPos = 0;
+    int newlinePos = raceFiles.indexOf('\n', startPos);
+    uint8_t fileIndex = 1;
+    
+    while (newlinePos >= 0 && fileIndex < 4 && raceCount < 4) {
+        String filename = raceFiles.substring(startPos, newlinePos);
+        if (filename.length() > 0 && (raceCount == 0 || filename != races[0].filename)) {
+            races[raceCount].filename = "/races/" + filename;
+            races[raceCount].index = fileIndex;
+            raceCount++;
+            fileIndex++;
+        }
+        startPos = newlinePos + 1;
+        newlinePos = raceFiles.indexOf('\n', startPos);
+    }
+    
+    // If no newline at end, last file
+    if (startPos < raceFiles.length() && raceCount < 4) {
+        String filename = raceFiles.substring(startPos);
+        if (filename.length() > 0 && (raceCount == 0 || filename != races[0].filename)) {
+            races[raceCount].filename = "/races/" + filename;
+            races[raceCount].index = fileIndex;
+            raceCount++;
         }
     }
     
-    // Export Button
-    int btnY = SCREEN_HEIGHT - 60;
-    if (dataLogger.isReady()) {
-        drawButton(BUTTON_MARGIN, btnY, SCREEN_WIDTH - 2*BUTTON_MARGIN, 
-                  BUTTON_HEIGHT, "Auf SD gespeichert", COLOR_SECONDARY);
+    // Show current race selection
+    int y = HEADER_HEIGHT + 10;
+    
+    if (raceCount == 0) {
+        tft.setTextColor(TFT_DARKGREY);
+        tft.setTextSize(2);
+        tft.setCursor(40, y + 60);
+        tft.print("Keine Rennen");
+    } else {
+        // Show which race we're viewing
+        tft.setTextColor(TFT_LIGHTGREY);
+        tft.setTextSize(1);
+        tft.setCursor(10, y);
+        
+        if (uiState.resultsPage == 0 && raceCount > 0) {
+            tft.print("Aktuelles Rennen:");
+        } else if (uiState.resultsPage < raceCount) {
+            tft.printf("Rennen %u/%u:", uiState.resultsPage, raceCount - 1);
+        }
+        
+        y += 15;
+        
+        // Load and display race results
+        if (uiState.resultsPage < raceCount) {
+            String raceFile = races[uiState.resultsPage].filename;
+            displayRaceResultsFromFile(raceFile, y);
+        }
+        
+        // Navigation buttons if multiple races
+        if (raceCount > 1) {
+            int btnY = SCREEN_HEIGHT - 50;
+            int btnW = 60;
+            
+            // Previous button
+            if (uiState.resultsPage > 0) {
+                drawButton(10, btnY, btnW, 30, "< Zuruck", COLOR_BUTTON);
+            }
+            
+            // Next button
+            if (uiState.resultsPage < raceCount - 1) {
+                drawButton(SCREEN_WIDTH - btnW - 10, btnY, btnW, 30, "Vor >", COLOR_BUTTON);
+            }
+            
+            // Page indicator
+            tft.setTextColor(TFT_DARKGREY);
+            tft.setTextSize(1);
+            tft.setTextDatum(MC_DATUM);
+            tft.drawString(String(uiState.resultsPage + 1) + "/" + String(raceCount), 
+                          SCREEN_WIDTH / 2, btnY + 15);
+        }
+    }
+}
+
+void displayRaceResultsFromFile(const String& filename, int startY) {
+    if (!dataLogger.exists(filename)) {
+        tft.setTextColor(TFT_DARKGREY);
+        tft.setTextSize(1);
+        tft.setCursor(10, startY + 20);
+        tft.print("Datei nicht gefunden");
+        return;
+    }
+    
+    // Read CSV file
+    String content = dataLogger.readFile(filename);
+    if (content.length() == 0) {
+        tft.setTextColor(TFT_DARKGREY);
+        tft.setTextSize(1);
+        tft.setCursor(10, startY + 20);
+        tft.print("Keine Daten");
+        return;
+    }
+    
+    // Parse CSV and build leaderboard
+    // Format: Team ID,Team Name,Lap Number,Timestamp,Duration,Time of Day
+    struct TeamStats {
+        uint8_t teamId;
+        String teamName;
+        uint16_t lapCount;
+        uint32_t bestLapDuration;
+        uint32_t totalDuration;
+    };
+    
+    std::map<uint8_t, TeamStats> teamStats;
+    
+    int lineStart = 0;
+    bool firstLine = true;
+    
+    while (lineStart < content.length()) {
+        int lineEnd = content.indexOf('\n', lineStart);
+        if (lineEnd < 0) lineEnd = content.length();
+        
+        String line = content.substring(lineStart, lineEnd);
+        
+        if (firstLine) {
+            firstLine = false;
+            lineStart = lineEnd + 1;
+            continue;  // Skip header
+        }
+        
+        // Parse CSV line
+        int pos = 0;
+        int commaPos = line.indexOf(',', pos);
+        if (commaPos < 0) {
+            lineStart = lineEnd + 1;
+            continue;
+        }
+        
+        uint8_t teamId = line.substring(pos, commaPos).toInt();
+        
+        pos = commaPos + 1;
+        commaPos = line.indexOf(',', pos);
+        if (commaPos < 0) {
+            lineStart = lineEnd + 1;
+            continue;
+        }
+        String teamName = line.substring(pos, commaPos);
+        
+        pos = commaPos + 1;
+        commaPos = line.indexOf(',', pos);
+        if (commaPos < 0) {
+            lineStart = lineEnd + 1;
+            continue;
+        }
+        uint16_t lapNumber = line.substring(pos, commaPos).toInt();
+        
+        pos = commaPos + 1;
+        commaPos = line.indexOf(',', pos);
+        if (commaPos < 0) {
+            lineStart = lineEnd + 1;
+            continue;
+        }
+        
+        pos = commaPos + 1;
+        commaPos = line.indexOf(',', pos);
+        if (commaPos < 0) {
+            lineStart = lineEnd + 1;
+            continue;
+        }
+        uint32_t duration = line.substring(pos, commaPos).toULong();
+        
+        // Update stats
+        if (teamStats.find(teamId) == teamStats.end()) {
+            TeamStats stats;
+            stats.teamId = teamId;
+            stats.teamName = teamName;
+            stats.lapCount = 0;
+            stats.bestLapDuration = UINT32_MAX;
+            stats.totalDuration = 0;
+            teamStats[teamId] = stats;
+        }
+        
+        TeamStats& stats = teamStats[teamId];
+        stats.lapCount++;
+        stats.totalDuration += duration;
+        if (duration < stats.bestLapDuration) {
+            stats.bestLapDuration = duration;
+        }
+        
+        lineStart = lineEnd + 1;
+    }
+    
+    // Convert to vector and sort
+    std::vector<TeamStats*> leaderboard;
+    for (auto& pair : teamStats) {
+        leaderboard.push_back(&pair.second);
+    }
+    
+    std::sort(leaderboard.begin(), leaderboard.end(), 
+              [](const TeamStats* a, const TeamStats* b) {
+                  if (a->lapCount != b->lapCount) {
+                      return a->lapCount > b->lapCount;
+                  }
+                  return a->bestLapDuration < b->bestLapDuration;
+              });
+    
+    // Display leaderboard
+    int y = startY + 5;
+    int pos = 1;
+    
+    for (auto* stats : leaderboard) {
+        if (y > SCREEN_HEIGHT - 80) break;
+        
+        const char* medal = "";
+        uint16_t medalColor = TFT_WHITE;
+        if (pos == 1) { medal = "1."; medalColor = TFT_GOLD; }
+        else if (pos == 2) { medal = "2."; medalColor = TFT_SILVER; }
+        else if (pos == 3) { medal = "3."; medalColor = 0xCD7F32; }
+        
+        tft.setTextColor(medalColor);
+        tft.setTextSize(2);
+        tft.setCursor(10, y);
+        tft.print(medal);
+        
+        tft.setTextColor(TFT_WHITE);
+        tft.setCursor(40, y);
+        tft.print(stats->teamName);
+        
+        tft.setTextSize(1);
+        tft.setCursor(20, y + 18);
+        tft.printf("%u Runden", stats->lapCount);
+        
+        if (stats->bestLapDuration < UINT32_MAX) {
+            tft.setCursor(120, y + 18);
+            tft.printf("Beste: %lu.%03lu s", 
+                      stats->bestLapDuration / 1000, 
+                      stats->bestLapDuration % 1000);
+        }
+        
+        y += 38;
+        pos++;
     }
 }
 
@@ -639,6 +842,18 @@ void drawSettingsScreen() {
     tft.print(dataLogger.isReady() ? "Bereit" : "Nicht verf.");
     
     y += 18;
+    
+    y += 18;
+    
+    // === SD Card Format Button ===
+    if (dataLogger.isReady()) {
+        tft.setTextColor(TFT_LIGHTGREY);
+        tft.setCursor(10, y);
+        tft.print("SD-Format:");
+        
+        drawButton(SCREEN_WIDTH - 110, y - 2, 100, 25, "Formatieren", COLOR_WARNING);
+        y += 20;
+    }
     
     // === Info ===
     tft.setTextColor(TFT_DARKGREY);

@@ -41,9 +41,11 @@ public:
     uint64_t getFreeSpace();
     uint64_t getUsedSpace();
     String listFiles(const String& dir = "/");
+    bool formatSD();  // Format SD card to FAT32
     
     // Export
     String getCurrentRaceFile();
+    String getRaceFileList(uint8_t maxFiles = 10);  // Get list of race files
     
 private:
     bool initialized;
@@ -53,6 +55,7 @@ private:
     // Helper
     String sanitizeFilename(const String& name);
     String generateRaceFilename(const String& raceName);
+    void deleteAllFiles(const String& dirPath);
 };
 
 #endif // DATA_LOGGER_H

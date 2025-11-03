@@ -50,6 +50,9 @@ struct UIState {
     uint32_t raceDuration;  // minutes
     bool selectedTeams[MAX_TEAMS];
     
+    // Results
+    uint8_t resultsPage;  // 0 = current, 1-3 = historical
+    
     // Touch
     uint16_t touchX;
     uint16_t touchY;
@@ -59,7 +62,8 @@ struct UIState {
     UIState() : currentScreen(SCREEN_HOME), previousScreen(SCREEN_HOME),
                 needsRedraw(true), editingTeamId(0), editingTeamName(""),
                 scrollOffset(0), raceName("Rennen"), raceDuration(60),
-                touchX(0), touchY(0), touched(false), lastTouchTime(0) {
+                touchX(0), touchY(0), touched(false), lastTouchTime(0),
+                resultsPage(0) {
         memset(selectedTeams, false, sizeof(selectedTeams));
     }
 };
@@ -77,6 +81,7 @@ void drawRaceRunningScreen();
 void drawRacePausedScreen();
 void drawRaceResultsScreen();
 void drawSettingsScreen();
+void displayRaceResultsFromFile(const String& filename, int startY);
 
 // Touch Handler
 void handleTouch(uint16_t x, uint16_t y);
