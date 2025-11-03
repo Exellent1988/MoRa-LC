@@ -32,6 +32,7 @@ String currentRaceName = "Test Race";
 int8_t lapRssiNear = DEFAULT_LAP_RSSI_NEAR;
 int8_t lapRssiFar = DEFAULT_LAP_RSSI_FAR;
 std::map<uint8_t, bool> beaconPresence;
+uint32_t countdownStartTime = 0;  // For race countdown screen
 
 // BLE Callback for lap detection
 void onBeaconDetected(const BeaconData& beacon) {
@@ -303,13 +304,57 @@ void loop() {
     // NOTE: Log levels are set once in setup() and should NOT be changed during runtime
     // Calling esp_log_level_set() here causes blocking and UI freezes!
     
+    // Race Running: Check for beacon presence timeouts (every 500ms)
+    if (raceRunning) {
+        static uint32_t lastPresenceCheck = 0;
+        if (millis() - lastPresenceCheck > 500) {
+            // Durch alle Teams gehen und prüfen ob Beacons noch vorhanden sind
+            for (uint8_t teamId = 1; teamId <= lapCounter.getTeamCount(); teamId++) {
+                TeamData* team = lapCounter.getTeam(teamId);
+                if (!team || team->beaconUUID.length() == 0) continue;
+                
+                // Beacon im Scanner suchen (per MAC-Adresse = beaconUUID)
+                BeaconData* beacon = bleScanner.getBeacon(team->beaconUUID);
+                
+                // Wenn Beacon nicht mehr im Scanner ODER zu alt → "weg"
+                if (!beacon || (millis() - beacon->lastSeen > BEACON_TIMEOUT)) {
+                    if (beaconPresence[teamId]) {
+                        Serial.printf("[Lap] Team %u: WEG (timeout: %s)\n", 
+                                     teamId, !beacon ? "not found" : "too old");
+                        beaconPresence[teamId] = false;
+                    }
+                }
+            }
+            lastPresenceCheck = millis();
+        }
+        
+        // Check if race time is up
+        if (millis() - raceStartTime >= raceDuration) {
+            raceRunning = false;
+            uiState.changeScreen(SCREEN_RACE_RESULTS);
+            
+            bleScanner.stopScan();
+            
+            // Finish race logging
+            if (dataLogger.isReady()) {
+                dataLogger.finishRace();
+            }
+            
+            // Reset presence tracking
+            beaconPresence.clear();
+            
+            Serial.println("\n=== RACE FINISHED ===");
+        }
+    }
+    
     // Smart beacon screen refresh - nur wenn sich was geändert hat!
     // OPTIMIERT: Keine Vollbild-Refreshes mehr, nur bei tatsächlichen Änderungen
     if (bleScanner.isScanning()) {
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
             uiState.currentScreen == SCREEN_BEACON_LIST) {
             static uint32_t lastBeaconRefresh = 0;
-            if (millis() - lastBeaconRefresh > 1000) {  // Check every 1 second (nicht 500ms!)
+            // REDUZIERT: 500ms für responsiveres UI (statt 1000ms)
+            if (millis() - lastBeaconRefresh > 500) {
                 auto beacons = bleScanner.getBeacons();
                 
                 // Change Detection: Hash aus Beacon-Count + RSSI-Summe
@@ -337,7 +382,8 @@ void loop() {
         }
     }
     
-    // Clean up old beacons (only every 5 seconds to reduce overhead)
+    // Clean up old beacons (only when NOT racing, for beacon assignment UI)
+    // WICHTIG: clearOldBeacons nur außerhalb des Rennens aufrufen!
     static uint32_t lastBeaconCleanup = 0;
     if (millis() - lastBeaconCleanup > 5000) {
         if (bleScanner.isScanning() && !raceRunning) {
@@ -346,15 +392,74 @@ void loop() {
         lastBeaconCleanup = millis();
     }
     
-    // Update race running screen if active (less frequent to reduce flicker)
+    // Handle countdown screen - update frequently and transition to race when done
+    if (uiState.currentScreen == SCREEN_RACE_COUNTDOWN) {
+        uint32_t elapsed = millis() - countdownStartTime;
+        
+        // Update countdown screen every 100ms for smooth countdown
+        static uint32_t lastCountdownUpdate = 0;
+        if (millis() - lastCountdownUpdate > 100) {
+            drawRaceCountdownScreen();
+            lastCountdownUpdate = millis();
+        }
+        
+        // After 10 seconds, start the race
+        if (elapsed >= 10000) {
+            raceStartTime = millis();
+            raceRunning = true;
+            uiState.changeScreen(SCREEN_RACE_RUNNING);
+            
+            // Start BLE scanning if not already started
+            if (!bleScanner.isScanning()) {
+                bleScanner.startScan(0);
+            }
+            
+            Serial.println("\n=== RACE STARTED ===");
+            Serial.printf("Name: %s\n", currentRaceName.c_str());
+            Serial.printf("Duration: %lu minutes\n", raceDuration / 60000);
+            Serial.printf("Teams: %u\n", lapCounter.getTeamCount());
+        }
+    }
+    
+    // Update race running screen if active - use partial updates to reduce flicker
     if (raceRunning && uiState.currentScreen == SCREEN_RACE_RUNNING) {
-        static uint32_t lastRaceUpdate = 0;
-        // CRITICAL: Only update every 2 seconds to reduce flicker!
-        // Full screen refresh causes visible flicker
-        // TODO: Implement partial updates (only time/laps)
-        if (millis() - lastRaceUpdate > 2000) {  // Slower: 500ms -> 2000ms
+        static uint32_t lastFullUpdate = 0;
+        static uint32_t lastPartialUpdate = 0;
+        
+        // Full screen refresh only when needed (scroll, new teams, etc.)
+        if (uiState.needsRedraw || millis() - lastFullUpdate > 10000) {  // Full refresh every 10s max
             drawRaceRunningScreen();
-            lastRaceUpdate = millis();
+            lastFullUpdate = millis();
+            lastPartialUpdate = millis();
+            uiState.needsRedraw = false;
+        } else {
+            // Partial update: only time and lap counts (every 500ms for smooth time display)
+            if (millis() - lastPartialUpdate > 500) {
+                updateRaceRunningScreenPartial();
+                lastPartialUpdate = millis();
+            }
+        }
+        
+        // Auto-scroll through leaderboard every 4 seconds
+        auto leaderboard = lapCounter.getLeaderboard(true);
+        if (leaderboard.size() > 0) {
+            int availableHeight = SCREEN_HEIGHT - HEADER_HEIGHT - 12 - 50;
+            int itemH = 42;
+            int itemSpacing = 4;
+            int maxVisible = availableHeight / (itemH + itemSpacing);
+            if (maxVisible < 2) maxVisible = 2;
+            
+            bool needsScroll = (int)leaderboard.size() > maxVisible;
+            
+            if (needsScroll && millis() - uiState.lastAutoScrollTime > 4000) {
+                uiState.raceRunningScrollOffset++;
+                // Wrap around if at end
+                if (uiState.raceRunningScrollOffset + maxVisible >= (int)leaderboard.size()) {
+                    uiState.raceRunningScrollOffset = 0;
+                }
+                uiState.lastAutoScrollTime = millis();
+                uiState.needsRedraw = true;
+            }
         }
     }
     
@@ -381,6 +486,9 @@ void drawScreen() {
         case SCREEN_RACE_SETUP:
             drawRaceSetupScreen();
             break;
+        case SCREEN_RACE_COUNTDOWN:
+            drawRaceCountdownScreen();
+            break;
         case SCREEN_RACE_RUNNING:
             drawRaceRunningScreen();
             break;
@@ -389,6 +497,12 @@ void drawScreen() {
             break;
         case SCREEN_RACE_RESULTS:
             drawRaceResultsScreen();
+            break;
+        case SCREEN_OLD_RESULTS_LIST:
+            drawOldResultsListScreen();
+            break;
+        case SCREEN_OLD_RESULTS_DETAIL:
+            drawOldResultsDetailScreen();
             break;
         case SCREEN_SETTINGS:
             drawSettingsScreen();

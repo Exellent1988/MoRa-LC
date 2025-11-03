@@ -24,9 +24,13 @@ void drawTeamEditScreen();
 void drawTeamBeaconAssignScreen();
 void drawBeaconListScreen();
 void drawRaceSetupScreen();
+void drawRaceCountdownScreen();
 void drawRaceRunningScreen();
+void updateRaceRunningScreenPartial();  // Partial update for race running (time/laps only)
 void drawRacePausedScreen();
 void drawRaceResultsScreen();
+void drawOldResultsListScreen();
+void drawOldResultsDetailScreen();
 void drawSettingsScreen();
 
 // Touch Handler
@@ -37,9 +41,12 @@ void handleTeamEditTouch(uint16_t x, uint16_t y);
 void handleBeaconAssignTouch(uint16_t x, uint16_t y);
 void handleBeaconListTouch(uint16_t x, uint16_t y);
 void handleRaceSetupTouch(uint16_t x, uint16_t y);
+void handleRaceCountdownTouch(uint16_t x, uint16_t y);
 void handleRaceRunningTouch(uint16_t x, uint16_t y);
 void handleRacePausedTouch(uint16_t x, uint16_t y);
 void handleRaceResultsTouch(uint16_t x, uint16_t y);
+void handleOldResultsListTouch(uint16_t x, uint16_t y);
+void handleOldResultsDetailTouch(uint16_t x, uint16_t y);
 void handleSettingsTouch(uint16_t x, uint16_t y);
 
 // Helper Functions (from ui_helper.h) - declarations here for convenience

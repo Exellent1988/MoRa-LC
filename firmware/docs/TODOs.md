@@ -8,7 +8,7 @@
 -  zu lange wartezeit zwischen, "rennen starten" und aneige des rennens. da vllt auch nen startcountdown von 10 sekunden einbauen, in der zwischenzeit kann ja die csv angelegt werden, und was sonst so war.
 - automatisches durchscrollen waehrend des rennens  um alle teams anzeigen zu koennen
 scrollbare liste bei den Ergebnissen.
-
+- 
 - Moeglichkeit alte rennergebnisse (auf der SD-Karte) anzuzeigen
 
 - Waerend des REnnens scheint das Beacon checken nach X-Sekunden nicht mehr zu funktionieren. ( Das ging in der alten Variante)

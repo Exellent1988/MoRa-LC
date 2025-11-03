@@ -13,6 +13,7 @@ bool isTouchInRect(uint16_t tx, uint16_t ty, int x, int y, int w, int h);
 void drawButton(int x, int y, int w, int h, const String& text, uint16_t color = COLOR_BUTTON);
 void drawHeader(const String& title, bool showBack = false);
 void showMessage(const String& title, const String& message, uint16_t color);
+bool showConfirmationDialog(const String& title, const String& message, uint16_t color);
 
 // Keyboard input functions
 String inputText(const String& prompt, const String& defaultValue = "");

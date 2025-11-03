@@ -70,6 +70,69 @@ void showMessage(const String& title, const String& message, uint16_t color) {
     uiState.needsRedraw = true;
 }
 
+bool showConfirmationDialog(const String& title, const String& message, uint16_t color) {
+    LGFX& lcd = display.getDisplay();
+    
+    // Draw dialog background
+    int dialogW = SCREEN_WIDTH - 40;
+    int dialogH = 140;
+    int dialogX = 20;
+    int dialogY = (SCREEN_HEIGHT - dialogH) / 2;
+    
+    // Background
+    lcd.fillRoundRect(dialogX, dialogY, dialogW, dialogH, 10, BACKGROUND_COLOR);
+    lcd.drawRoundRect(dialogX, dialogY, dialogW, dialogH, 10, 0x4208);
+    
+    // Title
+    lcd.setTextColor(color);
+    lcd.setTextSize(TEXT_SIZE_NORMAL);
+    lcd.setTextDatum(TC_DATUM);
+    lcd.drawString(title, SCREEN_WIDTH / 2, dialogY + 20);
+    
+    // Message
+    lcd.setTextColor(TEXT_COLOR);
+    lcd.setTextSize(1);
+    lcd.setTextDatum(TC_DATUM);
+    lcd.drawString(message, SCREEN_WIDTH / 2, dialogY + 50);
+    
+    // Buttons
+    int btnW = 100;
+    int btnH = 35;
+    int btnY = dialogY + dialogH - btnH - 15;
+    int btnSpacing = 20;
+    
+    // Cancel button (left)
+    int cancelX = dialogX + (dialogW - 2 * btnW - btnSpacing) / 2;
+    drawButton(cancelX, btnY, btnW, btnH, "Abbrechen", COLOR_BUTTON);
+    
+    // OK button (right)
+    int okX = cancelX + btnW + btnSpacing;
+    drawButton(okX, btnY, btnW, btnH, "OK", COLOR_DANGER);
+    
+    // Wait for touch input
+    uint32_t startTime = millis();
+    while (millis() - startTime < 60000) {  // 60 second timeout
+        uint16_t tx, ty;
+        if (display.getTouch(&tx, &ty)) {
+            // Cancel button
+            if (isTouchInRect(tx, ty, cancelX, btnY, btnW, btnH)) {
+                uiState.needsRedraw = true;
+                return false;
+            }
+            // OK button
+            if (isTouchInRect(tx, ty, okX, btnY, btnW, btnH)) {
+                uiState.needsRedraw = true;
+                return true;
+            }
+        }
+        delay(50);
+    }
+    
+    // Timeout = cancel
+    uiState.needsRedraw = true;
+    return false;
+}
+
 String inputText(const String& prompt, const String& defaultValue) {
     OnScreenKeyboard keyboard(display);
     String result = keyboard.getText(prompt, defaultValue, 20);
