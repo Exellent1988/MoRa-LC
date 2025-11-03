@@ -1,7 +1,7 @@
 #include "BLEScanner.h"
+#include <NimBLEDevice.h>
 #include <NimBLEScan.h>
 #include <NimBLEAdvertisedDevice.h>
-#include <NimBLEDevice.h>
 #include <cmath>
 #include "esp_log.h"
 
@@ -19,10 +19,10 @@
 // Internal Callbacks - Defined here before use
 // ============================================================
 
-class BLEScanner::AdvertisedDeviceCallbacks : public NimBLEAdvertisedDeviceCallbacks {
+class BLEScanner::AdvertisedDeviceCallbacks : public NimBLEScanCallbacks {
 public:
     AdvertisedDeviceCallbacks(BLEScanner* scanner) : scanner(scanner) {}
-    void onResult(NimBLEAdvertisedDevice* advertisedDevice);
+    void onResult(const NimBLEAdvertisedDevice* advertisedDevice);
 
 private:
     BLEScanner* scanner;
@@ -72,7 +72,7 @@ bool BLEScanner::begin() {
     }
     
     callbacks = new AdvertisedDeviceCallbacks(this);
-    pBLEScan->setAdvertisedDeviceCallbacks(callbacks, false);  // false = wantDuplicates
+    pBLEScan->setScanCallbacks(callbacks, false);  // false = wantDuplicates
     
     pBLEScan->setActiveScan(true);   // Active scan für bessere Erkennung
     pBLEScan->setInterval(100);      // ms
@@ -207,44 +207,46 @@ float BLEScanner::rssiToDistance(int8_t rssi, int8_t txPower) {
 // ============================================================
 
 void BLEScanner::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-    // CRITICAL: Disable logging in callback (called very frequently during scanning)
-    // NimBLE might enable logging again, so we disable it on every callback
-    esp_log_level_set("*", ESP_LOG_NONE);
-    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
-    esp_log_level_set("NimBLE", ESP_LOG_NONE);
-    esp_log_level_set("BLE", ESP_LOG_NONE);
+    // CRITICAL: Keep callback FAST - no blocking operations!
+    // This callback is called VERY frequently during scanning
+    // Any delay here will freeze the UI
     
-    BeaconData beacon;
+    // Disable logging (but only once per ~100 calls to save CPU)
+    static uint32_t logDisableCounter = 0;
+    if (++logDisableCounter % 100 == 0) {
+        esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
+        esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    }
     
-    // MAC-Adresse immer speichern
-    beacon.macAddress = advertisedDevice->getAddress().toString().c_str();
+    // Quick MAC address check first (fastest filter)
+    String macAddress = advertisedDevice->getAddress().toString().c_str();
     
-    // MAC-Adresse Filter (nur c3:00:... für Tracking-Beacons)
+    // MAC-Adresse Filter (nur c3:00:... für Tracking-Beacons) - EARLY RETURN
     if (scanner->uuidFilter.length() > 0) {
-        if (!beacon.macAddress.startsWith(scanner->uuidFilter)) {
-            // Nicht unser Beacon, ignorieren
-            return;
+        if (!macAddress.startsWith(scanner->uuidFilter)) {
+            return;  // Not our beacon, exit immediately
         }
     }
     
-    // Try to parse as iBeacon first
+    // Quick RSSI check before expensive parsing
+    int8_t rssi = advertisedDevice->getRSSI();
+    if (rssi < scanner->rssiThreshold) {
+        return;  // Too weak, exit immediately
+    }
+    
+    // Now parse beacon data (more expensive operations)
+    BeaconData beacon;
+    beacon.macAddress = macAddress;
+    beacon.rssi = rssi;
+    beacon.lastSeen = millis();
+    
+    // Try to parse as iBeacon (may be expensive, but only for filtered beacons)
     if (!scanner->parseIBeacon(advertisedDevice, beacon)) {
         // Fallback: Use MAC address as UUID for non-iBeacon devices
         beacon.uuid = beacon.macAddress;
         beacon.major = 0;
         beacon.minor = 0;
         beacon.txPower = -59;  // Default TX power
-        beacon.rssi = advertisedDevice->getRSSI();
-        beacon.lastSeen = millis();
-        
-        // Silent logging - only store, don't spam serial
-    } else {
-        // iBeacon parsed successfully - no logging spam
-    }
-    
-    // RSSI Filter
-    if (beacon.rssi < scanner->rssiThreshold) {
-        return;  // Silently filter - no logging spam
     }
     
     // Update beacon data (Key = MAC-Adresse!)
@@ -256,16 +258,18 @@ void BLEScanner::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* adv
         beacon.wasPresent = scanner->beacons[key].wasPresent;
     }
     
+    // Store beacon (fast map operation)
     scanner->beacons[key] = beacon;
-    scanner->beacons[key].wasPresent = true;  // Jetzt ist er da
+    scanner->beacons[key].wasPresent = true;
     
-    // Only log new beacons to reduce spam
+    // Only log new beacons (rare, so Serial.print is OK)
     if (isNew) {
         Serial.printf("[BLE] New beacon: MAC=%s, RSSI=%d dBm\n",
                      beacon.macAddress.c_str(), beacon.rssi);
     }
     
-    // Callback IMMER aufrufen (auch für Updates!)
+    // Callback (may be expensive - but this is needed for lap detection)
+    // Only call if callback is set
     if (scanner->beaconCallback) {
         scanner->beaconCallback(scanner->beacons[key]);
     }
@@ -318,6 +322,7 @@ bool BLEScanner::parseIBeacon(NimBLEAdvertisedDevice* device, BeaconData& beacon
     
     return true;
 }
+
 
 
 

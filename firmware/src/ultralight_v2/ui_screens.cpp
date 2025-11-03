@@ -72,21 +72,22 @@ void drawTeamsScreen() {
     } else {
         int displayCount = 0;
         for (auto* team : teams) {
-            if (displayCount >= 3) break;  // Max 3 sichtbar (mit größeren Items)
+            // Check if there's space for this team + button (60px for button)
+            if (y + LIST_ITEM_HEIGHT + BUTTON_MARGIN > SCREEN_HEIGHT - 60) break;
             
-            // Team Item - größer und besser lesbar
+            // Team Item - kompakt aber lesbar
             lcd.fillRoundRect(10, y, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT, 5, COLOR_BUTTON);
             lcd.drawRoundRect(10, y, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT, 5, 0x4208);  // Border
             
-            // Team Name - größer
+            // Team Name - kompakt
             lcd.setTextColor(COLOR_BUTTON_TEXT);
             lcd.setTextSize(TEXT_SIZE_NORMAL);
-            lcd.setCursor(15, y + 8);
+            lcd.setCursor(15, y + 6);
             lcd.printf("%u. %s", team->teamId, team->teamName.c_str());
             
-            // Beacon Info - klar lesbar
-            lcd.setTextSize(TEXT_SIZE_NORMAL);
-            lcd.setCursor(15, y + 30);
+            // Beacon Info - kompakter
+            lcd.setTextSize(1);  // Smaller for beacon info
+            lcd.setCursor(15, y + 26);
             if (team->beaconUUID.length() > 0) {
                 lcd.printf("Beacon: %.8s...", team->beaconUUID.c_str());
             } else {
@@ -311,7 +312,7 @@ void drawRaceSetupScreen() {
         lcd.print("Tippen...");
     }
     
-    y += inputH + 25;
+    y += inputH + 20;
     
     // Duration with +/- Controls - Label dunkel
     lcd.setTextColor(TEXT_COLOR);
@@ -319,51 +320,45 @@ void drawRaceSetupScreen() {
     lcd.setCursor(10, y);
     lcd.print("DAUER (MINUTEN)");
     
-    y += 12;
+    y += 18;
     
-    // Time display (large in center)
-    int timeBoxX = 60;
-    int timeBoxW = 120;
-    lcd.fillRoundRect(timeBoxX, y, timeBoxW, 38, 5, COLOR_SECONDARY);
-    lcd.setTextColor(0x0000);
-    lcd.setTextSize(3);
-    lcd.setTextDatum(MC_DATUM);
-    lcd.drawString(String(uiState.raceDuration), timeBoxX + timeBoxW/2, y + 19);
+    // Duration controls - BREITERE Buttons für bessere Lesbarkeit
+    int btnSize = BUTTON_HEIGHT - 8;
+    int btnWidth = 50;  // Breiter: 45 -> 50
     
-    // "-5" Button (left) - größer und besser lesbar
-    int btnSize = BUTTON_HEIGHT - 10;
-    lcd.fillRoundRect(10, y, 45, btnSize, 5, COLOR_BUTTON);
-    lcd.drawRoundRect(10, y, 45, btnSize, 5, 0x4208);
+    // "-5" Button (left) - breiter
+    lcd.fillRoundRect(10, y, btnWidth, btnSize, 5, COLOR_BUTTON);
+    lcd.drawRoundRect(10, y, btnWidth, btnSize, 5, 0x4208);
     lcd.setTextColor(COLOR_BUTTON_TEXT);
     lcd.setTextSize(TEXT_SIZE_NORMAL);
     lcd.setTextDatum(MC_DATUM);
-    lcd.drawString("-5", 32, y + btnSize/2);
+    lcd.drawString("-5", 10 + btnWidth/2, y + btnSize/2);
     
-    // Value Display - größer
-    lcd.fillRoundRect(60, y, 120, btnSize, 5, COLOR_SECONDARY);
-    lcd.drawRoundRect(60, y, 120, btnSize, 5, 0x4208);
+    // Value Display (center)
+    lcd.fillRoundRect(65, y, 110, btnSize, 5, COLOR_SECONDARY);
+    lcd.drawRoundRect(65, y, 110, btnSize, 5, 0x4208);
     lcd.setTextColor(COLOR_BUTTON_TEXT);
     lcd.setTextSize(TEXT_SIZE_LARGE);
     lcd.setTextDatum(MC_DATUM);
     lcd.drawString(String(uiState.raceDuration), 120, y + btnSize/2);
     
-    // "+5" Button (right) - größer und besser lesbar
-    lcd.fillRoundRect(185, y, 45, btnSize, 5, COLOR_BUTTON);
-    lcd.drawRoundRect(185, y, 45, btnSize, 5, 0x4208);
+    // "+5" Button (right) - breiter
+    lcd.fillRoundRect(180, y, btnWidth, btnSize, 5, COLOR_BUTTON);
+    lcd.drawRoundRect(180, y, btnWidth, btnSize, 5, 0x4208);
     lcd.setTextColor(COLOR_BUTTON_TEXT);
     lcd.setTextSize(TEXT_SIZE_NORMAL);
     lcd.setTextDatum(MC_DATUM);
-    lcd.drawString("+5", 207, y + btnSize/2);
+    lcd.drawString("+5", 180 + btnWidth/2, y + btnSize/2);
     
-    // "+15" Button (far right) - größer
-    lcd.fillRoundRect(235, y, 45, btnSize, 5, COLOR_BUTTON);
-    lcd.drawRoundRect(235, y, 45, btnSize, 5, 0x4208);
+    // "+15" Button (far right) - breiter
+    lcd.fillRoundRect(235, y, 50, btnSize, 5, COLOR_BUTTON);
+    lcd.drawRoundRect(235, y, 50, btnSize, 5, 0x4208);
     lcd.setTextColor(COLOR_BUTTON_TEXT);
     lcd.setTextSize(TEXT_SIZE_NORMAL);
     lcd.setTextDatum(MC_DATUM);
-    lcd.drawString("+15", 257, y + btnSize/2);
+    lcd.drawString("+15", 260, y + btnSize/2);
     
-    y += 48;
+    y += btnSize + 20;
     
     // Teams Label - dunkel
     lcd.setTextColor(TEXT_COLOR);
@@ -565,39 +560,98 @@ void drawSettingsScreen() {
     lcd.fillScreen(BACKGROUND_COLOR);
     drawHeader("Einstellungen", true);
     
-    int y = HEADER_HEIGHT + 15;
+    int y = HEADER_HEIGHT + 10;
     
-    // SD Card Format/Init Button - größer
+    // === RSSI Thresholds (wichtigste Einstellung!) ===
     lcd.setTextColor(TEXT_COLOR);
     lcd.setTextSize(TEXT_SIZE_NORMAL);
     lcd.setCursor(10, y);
+    lcd.print("LAP DETECTION:");
+    
+    y += 15;
+    
+    // RSSI NEAR (NAH)
+    lcd.setTextColor(TEXT_COLOR);
+    lcd.setTextSize(1);
+    lcd.setCursor(10, y);
+    lcd.print("NAH:");
+    
+    y += 10;  // Label above, then controls
+    
+    int btnW = 40;
+    int valW = 70;
+    int centerX = SCREEN_WIDTH / 2;
+    int totalW = btnW + 5 + valW + 5 + btnW;
+    int startX = centerX - totalW / 2;
+    
+    // "-" Button
+    drawButton(startX, y, btnW, 30, "-", COLOR_BUTTON);
+    
+    // Value Display
+    lcd.fillRoundRect(startX + btnW + 5, y, valW, 30, 3, COLOR_SECONDARY);
+    lcd.setTextColor(COLOR_BUTTON_TEXT);
+    lcd.setTextSize(TEXT_SIZE_NORMAL);
+    lcd.setTextDatum(MC_DATUM);
+    lcd.drawString(String(lapRssiNear), startX + btnW + 5 + valW/2, y + 15);
+    lcd.setTextDatum(TL_DATUM);
+    
+    // "+" Button
+    drawButton(startX + btnW + 5 + valW + 5, y, btnW, 30, "+", COLOR_BUTTON);
+    
+    y += 38;
+    
+    // RSSI FAR (WEG)
+    lcd.setTextColor(TEXT_COLOR);
+    lcd.setTextSize(1);
+    lcd.setCursor(10, y);
+    lcd.print("WEG:");
+    
+    y += 10;  // Label above, then controls
+    
+    // "-" Button
+    drawButton(startX, y, btnW, 30, "-", COLOR_BUTTON);
+    
+    // Value Display
+    lcd.fillRoundRect(startX + btnW + 5, y, valW, 30, 3, COLOR_SECONDARY);
+    lcd.setTextColor(COLOR_BUTTON_TEXT);
+    lcd.setTextSize(TEXT_SIZE_NORMAL);
+    lcd.setTextDatum(MC_DATUM);
+    lcd.drawString(String(lapRssiFar), startX + btnW + 5 + valW/2, y + 15);
+    lcd.setTextDatum(TL_DATUM);
+    
+    // "+" Button
+    drawButton(startX + btnW + 5 + valW + 5, y, btnW, 30, "+", COLOR_BUTTON);
+    
+    y += 38;
+    
+    // Separator
+    lcd.drawLine(10, y, SCREEN_WIDTH - 10, y, 0x4208);
+    y += 10;
+    
+    // === SD Card & Touch ===
+    // SD Card Format/Init Button - BREIT GENUG für Text!
+    int settingsBtnH = 30;  // Smaller than BUTTON_HEIGHT for better fit
+    int settingsBtnW = 145;  // Breiter: 125 -> 145
+    int settingsBtnX = SCREEN_WIDTH - settingsBtnW - 10;
+    
+    lcd.setTextColor(TEXT_COLOR);
+    lcd.setTextSize(TEXT_SIZE_NORMAL);
+    lcd.setCursor(10, y + 6);  // Center text vertically with smaller button
     if (dataLogger.isReady()) {
         lcd.print("SD-Format:");
-        drawButton(SCREEN_WIDTH - 120, y - 2, 110, BUTTON_HEIGHT - 10, "Formatieren", COLOR_WARNING);
+        drawButton(settingsBtnX, y, settingsBtnW, settingsBtnH, "Formatieren", COLOR_WARNING);
     } else {
         lcd.print("SD-Karte:");
-        drawButton(SCREEN_WIDTH - 120, y - 2, 110, BUTTON_HEIGHT - 10, "Init/Format", COLOR_SECONDARY);
+        drawButton(settingsBtnX, y, settingsBtnW, settingsBtnH, "Init/Format", COLOR_SECONDARY);
     }
-    y += BUTTON_HEIGHT + 5;
+    y += settingsBtnH + 8;
     
-    // Touch Calibration Button - größer
+    // Touch Calibration Button
     lcd.setTextColor(TEXT_COLOR);
     lcd.setTextSize(TEXT_SIZE_NORMAL);
-    lcd.setCursor(10, y);
+    lcd.setCursor(10, y + 6);
     lcd.print("Touch:");
-    drawButton(SCREEN_WIDTH - 120, y - 2, 110, BUTTON_HEIGHT - 10, "Kalibrieren", COLOR_SECONDARY);
-    y += BUTTON_HEIGHT + 5;
-    
-    // RSSI Thresholds - größer
-    lcd.setTextColor(TEXT_COLOR);
-    lcd.setTextSize(TEXT_SIZE_NORMAL);
-    lcd.setCursor(10, y);
-    lcd.print("RSSI Near/Far:");
-    lcd.setTextColor(TEXT_COLOR);
-    char rssiStr[20];
-    sprintf(rssiStr, "%d / %d", lapRssiNear, lapRssiFar);
-    lcd.setCursor(130, y);
-    lcd.print(rssiStr);
+    drawButton(settingsBtnX, y, settingsBtnW, settingsBtnH, "Kalibrieren", COLOR_SECONDARY);
 }
 
 // ============================================================
@@ -710,16 +764,27 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
         if (lapCounter.getTeamCount() >= MAX_TEAMS) {
             showMessage("Fehler", "Maximale Teams erreicht", COLOR_DANGER);
         } else {
-            // Create new team with default name
-            uint8_t newId = lapCounter.getTeamCount() + 1;
-            String newName = "Team " + String(newId);
+            // Create new team with default name - find next FREE ID
+            uint8_t newId = lapCounter.getNextFreeTeamId();
+            if (newId == 0) {
+                showMessage("Fehler", "Keine freie Team-ID", COLOR_DANGER);
+                return;
+            }
             
-            if (lapCounter.addTeam(newId, newName, "")) {
+            String newName = "Team " + String(newId);
+            String emptyBeacon = "";  // Beacon kann später zugeordnet werden
+            
+            if (lapCounter.addTeam(newId, newName, emptyBeacon)) {
+                // Save to persistence (like old variant)
                 persistence.saveTeams(lapCounter);
+                
                 uiState.editingTeamId = newId;
                 uiState.editingTeamName = newName;
                 uiState.changeScreen(SCREEN_TEAM_EDIT);
+                
+                Serial.printf("[Teams] Neues Team erstellt: ID=%u, Name=%s\n", newId, newName.c_str());
             } else {
+                Serial.printf("[Teams] ERROR: Team konnte nicht erstellt werden (ID=%u)\n", newId);
                 showMessage("Fehler", "Team konnte nicht erstellt werden", COLOR_DANGER);
             }
         }
@@ -728,18 +793,21 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
 }
 
 void handleTeamEditTouch(uint16_t x, uint16_t y) {
-    // Back button
-    if (isTouchInRect(x, y, 5, 5, 60, HEADER_HEIGHT)) {
+    // Back button - EXPLICIT handler (not global!)
+    // Old variant uses SCREEN_WIDTH-60, drawHeader shows button at right
+    if (isTouchInRect(x, y, SCREEN_WIDTH - 60, 0, 60, HEADER_HEIGHT)) {
         uiState.changeScreen(SCREEN_TEAMS);
         return;
     }
     
     int btnY = HEADER_HEIGHT + 15;
     
-    // Team Name edit (TODO: Keyboard input - for now just toggle)
+    // Team Name edit - USE KEYBOARD!
     if (isTouchInRect(x, y, 10, btnY + 25, SCREEN_WIDTH - 20, 36)) {
-        // TODO: Implement keyboard input
-        showMessage("Info", "Keyboard wird implementiert", COLOR_WARNING);
+        String newName = inputText("Team-Name", uiState.editingTeamName);
+        if (newName.length() > 0) {
+            uiState.editingTeamName = newName;
+        }
         return;
     }
     
@@ -829,43 +897,54 @@ void handleBeaconAssignTouch(uint16_t x, uint16_t y) {
 }
 
 void handleBeaconListTouch(uint16_t x, uint16_t y) {
-    // Back button
-    if (isTouchInRect(x, y, 5, 5, 60, HEADER_HEIGHT)) {
-        uiState.changeScreen(SCREEN_TEAM_BEACON_ASSIGN);
-        return;
-    }
+    // Back button - handled by global handler
     
     auto beacons = bleScanner.getBeacons();
     if (beacons.empty()) return;
     
-    // Same sort as in drawBeaconListScreen
+    // Sort by RSSI (match draw order)
     std::sort(beacons.begin(), beacons.end(), [](const BeaconData& a, const BeaconData& b) {
         return a.rssi > b.rssi;
     });
     
-    int y_start = HEADER_HEIGHT + 30;
-    int itemHeight = 34;
+    // Match exact layout from drawBeaconListScreen
+    int y_start = HEADER_HEIGHT + 12;  // After header
+    y_start += 25;  // After "Gefunden: X Beacon(s)" text
+    
+    int itemHeight = 42 + BUTTON_MARGIN;  // itemH + spacing (from drawBeaconListScreen)
+    int itemH = 42;  // Individual item height
     
     int index = 0;
     for (auto& beacon : beacons) {
-        if (index >= 8) break;
+        if (index >= 6) break;  // Max 6 visible (match drawBeaconListScreen)
         
         int itemY = y_start + (index * itemHeight);
         
-        if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 20, 32)) {
+        // Touch area for this beacon (full item height)
+        if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 20, itemH)) {
+            Serial.printf("[Touch] Beacon #%d clicked: MAC=%s UUID=%s (RSSI=%d) at y=%d\n", 
+                         index, beacon.macAddress.c_str(), beacon.uuid.c_str(), beacon.rssi, itemY);
+            
             float dist = BLEScanner::rssiToDistance(beacon.rssi, beacon.txPower);
             
             if (dist < 1.0) {
+                // Assign this beacon to current team
                 TeamData* team = lapCounter.getTeam(uiState.editingTeamId);
                 if (team) {
+                    // IMPORTANT: Store MAC address, not UUID!
                     team->beaconUUID = beacon.macAddress;
                     persistence.saveTeams(lapCounter);
-                    showMessage("Zugeordnet", "Beacon zugeordnet", COLOR_SECONDARY);
+                    
+                    Serial.printf("[Team %u] Beacon assigned: MAC=%s (UUID=%s)\n", 
+                                 uiState.editingTeamId, beacon.macAddress.c_str(), beacon.uuid.c_str());
+                    
+                    showMessage("Zugeordnet", "Beacon erfolgreich zugeordnet", COLOR_SECONDARY);
                     bleScanner.stopScan();
                     uiState.changeScreen(SCREEN_TEAM_EDIT);
+                    return;
                 }
             } else {
-                showMessage("Hinweis", "Beacon zu weit!\nNaher halten (<1m)", COLOR_WARNING);
+                showMessage("Hinweis", "Beacon zu weit! Naher halten (<1m)", COLOR_WARNING);
             }
             return;
         }
@@ -875,81 +954,99 @@ void handleBeaconListTouch(uint16_t x, uint16_t y) {
 }
 
 void handleRaceSetupTouch(uint16_t x, uint16_t y) {
-    // Back button
-    if (isTouchInRect(x, y, 5, 5, 60, HEADER_HEIGHT)) {
-        uiState.changeScreen(SCREEN_HOME);
+    // Back button handled by global handler
+    
+    int yPos = HEADER_HEIGHT + 10;
+    
+    // Race Name input - USE KEYBOARD!
+    int inputH = 45;
+    // MATCH drawRaceSetupScreen: label at y, input at y+20
+    if (isTouchInRect(x, y, 10, yPos + 20, SCREEN_WIDTH - 20, inputH)) {
+        String newName = inputText("Rennen-Name", uiState.raceName);
+        if (newName.length() > 0) {
+            uiState.raceName = newName;
+        }
         return;
     }
     
-    int btnY = HEADER_HEIGHT + 10;
+    // MATCH drawRaceSetupScreen: yPos += inputH + 20, then +18 for duration label
+    yPos += inputH + 20;  // After input box
+    yPos += 18;  // After "DAUER (MINUTEN)" label
     
-    // Race Name input (TODO: Keyboard - for now just placeholder)
-    if (isTouchInRect(x, y, 10, btnY + 12, SCREEN_WIDTH - 20, 32)) {
-        // TODO: Implement keyboard input
-        showMessage("Info", "Keyboard wird implementiert", COLOR_WARNING);
-        return;
-    }
+    // Duration controls - EXACT positions from drawRaceSetupScreen
+    int btnSize = BUTTON_HEIGHT - 8;  // Should be 34
+    int btnWidth = 50;  // Width for +5 and -5 buttons
     
-    btnY += 50 + 12;
-    
-    // Duration controls
-    int btnSize = 38;
-    
-    // "-5" Button
-    if (isTouchInRect(x, y, 10, btnY, 45, btnSize)) {
+    // "-5" Button (left) - x=10, w=50
+    if (isTouchInRect(x, y, 10, yPos, 50, btnSize)) {
         if (uiState.raceDuration >= 5) {
             uiState.raceDuration -= 5;
         } else {
             uiState.raceDuration = 1;
         }
+        Serial.printf("[RaceSetup] Duration: %u min (-5)\n", uiState.raceDuration);
         uiState.needsRedraw = true;
         return;
     }
     
-    // "+5" Button
-    if (isTouchInRect(x, y, 185, btnY, 45, btnSize)) {
+    // Time display (center) - x=65, w=110 - CLICKABLE for manual input
+    if (isTouchInRect(x, y, 65, yPos, 110, btnSize)) {
+        // TODO: Manual time input (keyboard)
+        showMessage("Info", "Manuelle Eingabe kommt noch", COLOR_WARNING);
+        return;
+    }
+    
+    // "+5" Button (right) - x=180, w=50
+    if (isTouchInRect(x, y, 180, yPos, 50, btnSize)) {
         if (uiState.raceDuration <= 175) {
             uiState.raceDuration += 5;
         } else {
             uiState.raceDuration = 180;
         }
+        Serial.printf("[RaceSetup] Duration: %u min (+5)\n", uiState.raceDuration);
         uiState.needsRedraw = true;
         return;
     }
     
-    // "+15" Button
-    if (isTouchInRect(x, y, 235, btnY, 45, btnSize)) {
+    // "+15" Button (far right) - x=235, w=50
+    if (isTouchInRect(x, y, 235, yPos, 50, btnSize)) {
         if (uiState.raceDuration <= 165) {
             uiState.raceDuration += 15;
         } else {
             uiState.raceDuration = 180;
         }
+        Serial.printf("[RaceSetup] Duration: %u min (+15)\n", uiState.raceDuration);
         uiState.needsRedraw = true;
         return;
     }
     
-    btnY += 48 + 12;
+    yPos += btnSize + 20 + 12;  // btnSize + spacing + teams label
     
-    // Team checkboxes
+    // Team checkboxes - iterate through all teams properly
     int teamCount = lapCounter.getTeamCount();
     if (teamCount > 0) {
-        btnY += 12;
-        
-        for (uint8_t i = 1; i <= MAX_TEAMS && i <= teamCount; i++) {
-            if (btnY > SCREEN_HEIGHT - 60) break;
+        auto teams = lapCounter.getAllTeams();
+        for (auto* team : teams) {
+            if (!team) continue;
+            if (yPos > SCREEN_HEIGHT - 60) break;  // Space for Start button
             
-            if (isTouchInRect(x, y, 10, btnY, SCREEN_WIDTH - 20, 20)) {
-                uiState.selectedTeams[i-1] = !uiState.selectedTeams[i-1];
+            int teamH = 28;
+            if (isTouchInRect(x, y, 10, yPos, SCREEN_WIDTH - 20, teamH)) {
+                // Toggle selection for this team ID (index = teamId - 1)
+                uiState.selectedTeams[team->teamId - 1] = !uiState.selectedTeams[team->teamId - 1];
+                Serial.printf("[RaceSetup] Team %u (%s) %s\n", 
+                             team->teamId, team->teamName.c_str(), 
+                             uiState.selectedTeams[team->teamId - 1] ? "selected" : "deselected");
                 uiState.needsRedraw = true;
                 return;
             }
             
-            btnY += 23;
+            yPos += teamH + 3;  // Match drawRaceSetupScreen spacing
         }
     }
     
     // Start button
-    btnY = SCREEN_HEIGHT - 50;
+    int btnY = SCREEN_HEIGHT - 50;
     if (isTouchInRect(x, y, 10, btnY, SCREEN_WIDTH - 20, BUTTON_HEIGHT)) {
         if (lapCounter.getTeamCount() == 0) {
             showMessage("Fehler", "Keine Teams!", COLOR_DANGER);
@@ -1060,24 +1157,99 @@ void handleRaceResultsTouch(uint16_t x, uint16_t y) {
 }
 
 void handleSettingsTouch(uint16_t x, uint16_t y) {
-    // Back button
-    if (isTouchInRect(x, y, 5, 5, 25, 20)) {
-        uiState.changeScreen(SCREEN_HOME);
+    // Back button handled by global handler
+    
+    int yStart = HEADER_HEIGHT + 10 + 15 + 10;  // Title + "LAP DETECTION:" + "NAH:" label
+    int btnW = 40;
+    int valW = 70;
+    int centerX = SCREEN_WIDTH / 2;
+    int totalW = btnW + 5 + valW + 5 + btnW;
+    int startX = centerX - totalW / 2;
+    
+    // === RSSI NEAR Controls ===
+    int yNear = yStart;
+    
+    // "-" Button (NEAR)
+    if (isTouchInRect(x, y, startX, yNear, btnW, 30)) {
+        if (lapRssiNear > MIN_RSSI) {
+            lapRssiNear -= 5;
+            
+            // Save to NVS
+            persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            
+            Serial.printf("[Settings] RSSI NEAR: %d dBm\n", lapRssiNear);
+            uiState.needsRedraw = true;
+        }
         return;
     }
     
-    int btnY = HEADER_HEIGHT + 15;
+    // "+" Button (NEAR)
+    if (isTouchInRect(x, y, startX + btnW + 5 + valW + 5, yNear, btnW, 30)) {
+        if (lapRssiNear < MAX_RSSI) {
+            lapRssiNear += 5;
+            
+            // Save to NVS
+            persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            
+            Serial.printf("[Settings] RSSI NEAR: %d dBm\n", lapRssiNear);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
     
-    // SD Format/Init button - größer
-    if (isTouchInRect(x, y, SCREEN_WIDTH - 120, btnY - 2, 110, BUTTON_HEIGHT - 10)) {
+    // === RSSI FAR Controls ===
+    int yFar = yStart + 38 + 10;  // NEAR controls + "WEG:" label
+    
+    // "-" Button (FAR)
+    if (isTouchInRect(x, y, startX, yFar, btnW, 30)) {
+        if (lapRssiFar > MIN_RSSI) {
+            lapRssiFar -= 5;
+            
+            // Save to NVS
+            persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            
+            Serial.printf("[Settings] RSSI FAR: %d dBm\n", lapRssiFar);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // "+" Button (FAR)
+    if (isTouchInRect(x, y, startX + btnW + 5 + valW + 5, yFar, btnW, 30)) {
+        if (lapRssiFar < MAX_RSSI) {
+            lapRssiFar += 5;
+            
+            // Save to NVS
+            persistence.saveRssiThresholds(lapRssiNear, lapRssiFar);
+            
+            Serial.printf("[Settings] RSSI FAR: %d dBm\n", lapRssiFar);
+            uiState.needsRedraw = true;
+        }
+        return;
+    }
+    
+    // === SD & Touch Buttons ===
+    int btnY = yFar + 38 + 10;  // FAR controls + separator
+    int settingsBtnH = 30;  // Match drawSettingsScreen
+    int settingsBtnW = 145;  // Match drawSettingsScreen
+    int settingsBtnX = SCREEN_WIDTH - settingsBtnW - 10;
+    
+    // SD Format/Init button - match exact position from draw
+    if (isTouchInRect(x, y, settingsBtnX, btnY, settingsBtnW, settingsBtnH)) {
         if (dataLogger.isReady()) {
+            // Confirmation dialog
             showMessage("WARNUNG!", "Alle Daten werden geloscht!", COLOR_DANGER);
             delay(2000);
+            // TODO: Add proper confirmation button instead of auto-continue
             if (dataLogger.formatSD()) {
                 showMessage("Erfolg", "SD-Karte formatiert", COLOR_SECONDARY);
+                // Reinitialize SD after format
                 dataLogger.begin(SD_CS_PIN);
+            } else {
+                showMessage("Fehler", "Formatierung fehlgeschlagen", COLOR_DANGER);
             }
         } else {
+            // Try to initialize and format
             if (dataLogger.begin(SD_CS_PIN)) {
                 showMessage("Erfolg", "SD-Karte initialisiert", COLOR_SECONDARY);
             } else {
@@ -1087,10 +1259,10 @@ void handleSettingsTouch(uint16_t x, uint16_t y) {
         uiState.needsRedraw = true;
         return;
     }
-    btnY += BUTTON_HEIGHT + 5;
+    btnY += settingsBtnH + 8;  // Match spacing from drawSettingsScreen
     
-    // Touch Calibration button - größer
-    if (isTouchInRect(x, y, SCREEN_WIDTH - 120, btnY - 2, 110, BUTTON_HEIGHT - 10)) {
+    // Touch Calibration button - match exact position from draw
+    if (isTouchInRect(x, y, settingsBtnX, btnY, settingsBtnW, settingsBtnH)) {
         display.calibrateTouch();
         uiState.needsRedraw = true;
         return;

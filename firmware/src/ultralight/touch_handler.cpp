@@ -1,6 +1,7 @@
 #include "ui_screens.h"
 #include "persistence.h"
 #include "DataLogger.h"
+#include "touch_wrapper.h"
 #include <algorithm>  // For std::sort
 #include <map>
 

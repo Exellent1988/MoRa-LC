@@ -1,7 +1,10 @@
 #include "ui_helper.h"
+#include "ui_state.h"
 #include "display_manager.h"
+#include "ui_keyboard.h"
 
 extern DisplayManager display;
+extern UIState uiState;
 
 void drawHeader(const String& title, bool showBack) {
     LGFX& lcd = display.getDisplay();
@@ -50,29 +53,34 @@ bool isTouchInRect(uint16_t tx, uint16_t ty, int x, int y, int w, int h) {
 void showMessage(const String& title, const String& message, uint16_t color) {
     LGFX& lcd = display.getDisplay();
     
-    // Message box background - größer und besser lesbar
-    int boxW = SCREEN_WIDTH - 40;
-    int boxH = 140;
-    int boxX = 20;
-    int boxY = (SCREEN_HEIGHT - boxH) / 2;
-    
-    // Background (weiß/hellgrau)
-    lcd.fillRoundRect(boxX, boxY, boxW, boxH, 10, 0xFFFF);  // White background
-    lcd.drawRoundRect(boxX, boxY, boxW, boxH, 10, color);
-    
-    // Title - größer und dunkel
+    // Simple message like old variant - no OK button, just delay
+    lcd.fillScreen(BACKGROUND_COLOR);
     lcd.setTextColor(color);
-    lcd.setTextSize(TEXT_SIZE_LARGE);
-    lcd.setTextDatum(TC_DATUM);
-    lcd.drawString(title, SCREEN_WIDTH / 2, boxY + 20);
+    lcd.setTextSize(TEXT_SIZE_NORMAL);  // Smaller: LARGE -> NORMAL
     
-    // Message - dunkler Text, größer
+    lcd.setTextDatum(TC_DATUM);  // Top Center
+    lcd.drawString(title, SCREEN_WIDTH / 2, 60);  // Higher: 80 -> 60
+    
+    lcd.setTextSize(1);  // Even smaller for message
     lcd.setTextColor(TEXT_COLOR);
-    lcd.setTextSize(TEXT_SIZE_NORMAL);
     lcd.setTextDatum(TC_DATUM);
-    lcd.drawString(message, SCREEN_WIDTH / 2, boxY + 60);
+    lcd.drawString(message, SCREEN_WIDTH / 2, 100);  // Higher: 120 -> 100
     
-    // OK button - größer
-    drawButton(boxX + boxW / 2 - 50, boxY + boxH - 40, 100, 35, "OK", COLOR_SECONDARY);
+    delay(2000);  // Show for 2 seconds like old variant
+    uiState.needsRedraw = true;
+}
+
+String inputText(const String& prompt, const String& defaultValue) {
+    OnScreenKeyboard keyboard(display);
+    String result = keyboard.getText(prompt, defaultValue, 20);
+    uiState.needsRedraw = true;
+    return result;
+}
+
+uint32_t inputNumber(const String& prompt, uint32_t defaultValue, uint32_t min, uint32_t max) {
+    OnScreenKeyboard keyboard(display);
+    uint32_t result = keyboard.getNumber(prompt, defaultValue, min, max);
+    uiState.needsRedraw = true;
+    return result;
 }
 

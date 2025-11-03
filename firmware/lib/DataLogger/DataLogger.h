@@ -51,6 +51,7 @@ private:
     bool initialized;
     String currentRaceFile;
     uint32_t raceStartTime;
+    uint8_t csPin;  // Store CS pin for formatting
     
     // Helper
     String sanitizeFilename(const String& name);

@@ -11,7 +11,7 @@
 
 // Display
 #define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
+#define SCREEN_HEIGHT 230
 #define BACKGROUND_COLOR 0xCE59  // Light Gray (heller Hintergrund für bessere Lesbarkeit)
 #define TEXT_COLOR 0x0000        // Black (dunkler Text auf hellem Hintergrund)
 #define ACCENT_COLOR 0x07E0      // Green

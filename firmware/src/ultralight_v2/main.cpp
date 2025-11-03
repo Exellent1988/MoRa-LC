@@ -216,10 +216,24 @@ void setup() {
     uiState.changeScreen(SCREEN_HOME);
 }
 
-// Forward declaration
+// Forward declarations
 void drawScreen();
+void drawTeamBeaconAssignScreen();
+void drawBeaconListScreen();
 
 void loop() {
+    // Auto-refresh beacon screens while scanning (CRITICAL!)
+    if (bleScanner.isScanning()) {
+        if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
+            uiState.currentScreen == SCREEN_BEACON_LIST) {
+            static uint32_t lastBeaconRefresh = 0;
+            if (millis() - lastBeaconRefresh > 1000) {  // Refresh every second
+                drawScreen();
+                lastBeaconRefresh = millis();
+            }
+        }
+    }
+    
     // Touch handling
     uint16_t x, y;
     if (display.getTouch(&x, &y)) {
@@ -296,10 +310,31 @@ void loop() {
         lastLogDisable = millis();
     }
     
-    // Clean up old beacons (only every second to reduce overhead)
+    // Auto-refresh beacon screens while scanning (from old variant - prevents freezing)
+    // CRITICAL: Must call screen draw functions directly, not just set needsRedraw
+    // This prevents the UI from freezing during beacon scanning
+    if (bleScanner.isScanning()) {
+        if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
+            uiState.currentScreen == SCREEN_BEACON_LIST) {
+            static uint32_t lastBeaconRefresh = 0;
+            if (millis() - lastBeaconRefresh > 1000) {  // Refresh every second
+                // Direct screen redraw - EXACTLY like old variant
+                if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN) {
+                    drawTeamBeaconAssignScreen();
+                } else if (uiState.currentScreen == SCREEN_BEACON_LIST) {
+                    drawBeaconListScreen();
+                }
+                lastBeaconRefresh = millis();
+            }
+        }
+    }
+    
+    // Clean up old beacons (only every 5 seconds to reduce overhead)
     static uint32_t lastBeaconCleanup = 0;
-    if (millis() - lastBeaconCleanup > 1000) {
-        bleScanner.clearOldBeacons(BEACON_TIMEOUT);
+    if (millis() - lastBeaconCleanup > 5000) {
+        if (bleScanner.isScanning() && !raceRunning) {
+            bleScanner.clearOldBeacons(BEACON_TIMEOUT);
+        }
         lastBeaconCleanup = millis();
     }
     

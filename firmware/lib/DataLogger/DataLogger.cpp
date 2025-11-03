@@ -1,15 +1,23 @@
 #include "DataLogger.h"
 
+// For real SD card formatting
+#ifdef ULTRALIGHT_V2
+#include <SdFat.h>
+SdFat SD_FAT;
+#endif
+
 DataLogger::DataLogger() 
     : initialized(false)
     , currentRaceFile("")
-    , raceStartTime(0) {
+    , raceStartTime(0)
+    , csPin(5) {  // Default CS pin
 }
 
 DataLogger::~DataLogger() {
 }
 
 bool DataLogger::begin(uint8_t csPin) {
+    this->csPin = csPin;  // Store CS pin for later use (formatting)
     Serial.printf("[DataLogger] Initializing SD card (CS Pin: %u)...\n", csPin);
     
     if (!SD.begin(csPin)) {
@@ -239,53 +247,166 @@ String DataLogger::getCurrentRaceFile() {
 }
 
 bool DataLogger::formatSD() {
-    if (!initialized) {
-        Serial.println("[DataLogger] ERROR: SD card not initialized");
-        return false;
-    }
-    
     Serial.println("[DataLogger] WARNING: Formatting SD card - ALL DATA WILL BE LOST!");
+    Serial.println("[DataLogger] This will perform a REAL low-level format to FAT32!");
     
     // Close any open files
     currentRaceFile = "";
     
-    // Note: ESP32 SD library doesn't support format directly
-    // We need to use SDFat library or delete all files
-    // For now, we'll delete all files in /races directory
+#ifdef ULTRALIGHT_V2
+    // Use SDFat library for REAL low-level formatting to FAT32
+    Serial.println("[DataLogger] Initializing SDFat library for REAL formatting...");
     
-    File root = SD.open("/");
-    if (!root) {
-        Serial.println("[DataLogger] ERROR: Cannot open root directory");
+    // Use stored CS pin
+    uint8_t csPin = this->csPin;
+    Serial.printf("[DataLogger] Using CS pin: %u\n", csPin);
+    
+    // Initialize SDFat with SPI config
+    SdSpiConfig config(csPin, DEDICATED_SPI, SD_SCK_MHZ(4));
+    
+    // Create SdCard object for low-level access
+    SdSpiCard card;
+    
+    // Initialize card for formatting (low-level access)
+    if (!card.begin(config)) {
+        Serial.println("[DataLogger] ERROR: Failed to initialize SD card for formatting");
+        Serial.println("[DataLogger] Card may not be inserted or defective");
         return false;
     }
     
-    // Delete all files recursively
+    // Perform REAL low-level format to FAT32
+    Serial.println("[DataLogger] ========================================");
+    Serial.println("[DataLogger] Starting REAL low-level format to FAT32");
+    Serial.println("[DataLogger] This will completely wipe the card!");
+    Serial.println("[DataLogger] This may take 30-120 seconds...");
+    Serial.println("[DataLogger] ========================================");
+    
+    // Initialize SDFat filesystem (may fail if card not formatted - that's OK)
+    // We need the card initialized, not necessarily the filesystem
+    if (!SD_FAT.begin(config)) {
+        Serial.println("[DataLogger] Card initialized but filesystem not found - will format");
+    }
+    
+    // Use SDFat's format() method for REAL FAT32 formatting
+    // This creates a NEW FAT32 filesystem on the card (low-level format)
+    Serial.println("[DataLogger] Formatting FAT32 filesystem...");
+    Serial.println("[DataLogger] This performs a REAL low-level format!");
+    
+    // Format using SDFat's format() method
+    // This creates a new FAT32 filesystem on the card
+    if (!SD_FAT.format(&Serial)) {
+        Serial.println("[DataLogger] ERROR: Format operation failed");
+        Serial.println("[DataLogger] Card may be write-protected or defective");
+        Serial.println("[DataLogger] Try formatting with external tool (FAT32)");
+        card.end();
+        SD_FAT.end();
+        return false;
+    }
+    
+    Serial.println("[DataLogger] ========================================");
+    Serial.println("[DataLogger] Format complete! FAT32 filesystem created.");
+    Serial.println("[DataLogger] ========================================");
+    
+    // Close SDFat and card
+    SD_FAT.end();
+    card.end();
+    
+    // Small delay for card to stabilize
+    delay(500);
+    
+    // Reinitialize standard SD library to use formatted card
+    Serial.println("[DataLogger] Reinitializing SD library...");
+    if (!SD.begin(csPin)) {
+        Serial.println("[DataLogger] ERROR: Failed to reinitialize SD after format");
+        Serial.println("[DataLogger] Card formatted but library init failed");
+        initialized = false;
+        return false;
+    }
+    
+    // Verify card is accessible
+    uint8_t cardType = SD.cardType();
+    if (cardType == CARD_NONE) {
+        Serial.println("[DataLogger] ERROR: SD card not accessible after format");
+        initialized = false;
+        return false;
+    }
+    
+    // Recreate essential directories
+    if (!SD.exists("/races")) {
+        if (SD.mkdir("/races")) {
+            Serial.println("[DataLogger] Created /races directory");
+        } else {
+            Serial.println("[DataLogger] WARNING: Failed to create /races directory");
+        }
+    }
+    
+    // Get card info
+    uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+    uint64_t freeSpace = getFreeSpace() / (1024 * 1024);
+    
+    Serial.println("[DataLogger] ========================================");
+    Serial.println("[DataLogger] SD CARD FORMATTED SUCCESSFULLY!");
+    Serial.printf("[DataLogger] Card type: %s\n", 
+                  cardType == CARD_SDHC ? "SDHC" : 
+                  cardType == CARD_SD ? "SDSC" : "UNKNOWN");
+    Serial.printf("[DataLogger] Total size: %llu MB\n", cardSize);
+    Serial.printf("[DataLogger] Free space: %llu MB\n", freeSpace);
+    Serial.println("[DataLogger] ========================================");
+    
+    initialized = true;
+    return true;
+#else
+    // Old variant: Only delete files (no real format available)
+    Serial.println("[DataLogger] WARNING: Real formatting not available in old variant");
+    Serial.println("[DataLogger] Deleting all files and directories instead...");
+    
     deleteAllFiles("/");
     
-    // Recreate races directory
+    if (SD.exists("/races")) {
+        SD.rmdir("/races");
+    }
+    
     if (!SD.exists("/races")) {
         SD.mkdir("/races");
     }
     
-    Serial.println("[DataLogger] SD card 'formatted' (all files deleted)");
+    Serial.println("[DataLogger] All files deleted (NOT a real format - use external tool)");
     return true;
+#endif
 }
 
 void DataLogger::deleteAllFiles(const String& dirPath) {
     File dir = SD.open(dirPath.c_str());
-    if (!dir || !dir.isDirectory()) {
+    if (!dir) {
+        Serial.printf("[DataLogger] WARNING: Cannot open directory: %s\n", dirPath.c_str());
         return;
     }
     
+    if (!dir.isDirectory()) {
+        // It's a file, not a directory - delete it
+        dir.close();
+        if (SD.remove(dirPath.c_str())) {
+            Serial.printf("[DataLogger] Deleted file: %s\n", dirPath.c_str());
+        }
+        return;
+    }
+    
+    // It's a directory - delete all files and subdirectories
     File file = dir.openNextFile();
     while (file) {
         String filePath = String(file.name());
         if (file.isDirectory()) {
+            // Recursively delete subdirectory
             deleteAllFiles(filePath);
+            // Remove empty directory
             SD.rmdir(filePath.c_str());
+            Serial.printf("[DataLogger] Removed directory: %s\n", filePath.c_str());
         } else {
-            SD.remove(filePath.c_str());
-            Serial.printf("[DataLogger] Deleted: %s\n", filePath.c_str());
+            // Delete file
+            file.close();
+            if (SD.remove(filePath.c_str())) {
+                Serial.printf("[DataLogger] Deleted: %s\n", filePath.c_str());
+            }
         }
         file = dir.openNextFile();
     }

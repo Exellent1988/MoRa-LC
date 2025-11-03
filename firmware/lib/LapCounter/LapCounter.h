@@ -50,6 +50,7 @@ public:
     TeamData* getTeamByBeacon(const String& beaconUUID);
     std::vector<TeamData*> getAllTeams();
     uint8_t getTeamCount();
+    uint8_t getNextFreeTeamId();  // Find next available team ID
     
     // Runden-Zählung
     bool recordLap(const String& beaconUUID, uint32_t timestamp = 0);

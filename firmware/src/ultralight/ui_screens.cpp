@@ -678,7 +678,7 @@ void displayRaceResultsFromFile(const String& filename, int startY) {
             lineStart = lineEnd + 1;
             continue;
         }
-        uint32_t duration = line.substring(pos, commaPos).toULong();
+        uint32_t duration = (uint32_t)line.substring(pos, commaPos).toInt();
         
         // Update stats
         if (teamStats.find(teamId) == teamStats.end()) {
@@ -726,7 +726,7 @@ void displayRaceResultsFromFile(const String& filename, int startY) {
         uint16_t medalColor = TFT_WHITE;
         if (pos == 1) { medal = "1."; medalColor = TFT_GOLD; }
         else if (pos == 2) { medal = "2."; medalColor = TFT_SILVER; }
-        else if (pos == 3) { medal = "3."; medalColor = 0xCD7F32; }
+        else if (pos == 3) { medal = "3."; medalColor = 0xC618; }  // Bronze in RGB565
         
         tft.setTextColor(medalColor);
         tft.setTextSize(2);

@@ -1,6 +1,10 @@
 #include "LapCounter.h"
 #include <algorithm>
 
+#ifndef MAX_TEAMS
+#define MAX_TEAMS 20  // Default max teams if not defined in config
+#endif
+
 LapCounter::LapCounter() {
 }
 
@@ -14,8 +18,8 @@ bool LapCounter::addTeam(uint8_t teamId, const String& teamName, const String& b
         return false;
     }
     
-    // Prüfe ob Beacon bereits zugeordnet
-    if (findTeamByBeacon(beaconUUID) != nullptr) {
+    // Prüfe ob Beacon bereits zugeordnet (NUR wenn nicht leer!)
+    if (beaconUUID.length() > 0 && findTeamByBeacon(beaconUUID) != nullptr) {
         Serial.printf("[LapCounter] Beacon %s already assigned\n", beaconUUID.c_str());
         return false;
     }
@@ -65,6 +69,16 @@ std::vector<TeamData*> LapCounter::getAllTeams() {
 
 uint8_t LapCounter::getTeamCount() {
     return teams.size();
+}
+
+uint8_t LapCounter::getNextFreeTeamId() {
+    // Find the next free ID starting from 1
+    for (uint8_t id = 1; id <= MAX_TEAMS; id++) {
+        if (findTeam(id) == nullptr) {
+            return id;
+        }
+    }
+    return 0;  // No free ID found
 }
 
 bool LapCounter::recordLap(const String& beaconUUID, uint32_t timestamp) {
@@ -247,6 +261,11 @@ TeamData* LapCounter::findTeam(uint8_t teamId) {
 }
 
 TeamData* LapCounter::findTeamByBeacon(const String& beaconUUID) {
+    // Leere Beacon-Strings niemals matchen (viele Teams können keinen Beacon haben)
+    if (beaconUUID.length() == 0) {
+        return nullptr;
+    }
+    
     for (auto& team : teams) {
         if (team.beaconUUID == beaconUUID) {
             return &team;
