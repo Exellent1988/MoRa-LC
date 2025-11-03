@@ -95,12 +95,11 @@ void BLEScanner::startScan(uint32_t duration) {
     Serial.printf("[BLE] Starting scan (duration: %u ms)\n", duration);
     scanning = true;
     
-    // CRITICAL FIX: Even with "true" (non-blocking), very long durations BLOCK!
-    // Solution: Use short intervals and restart automatically
-    // Duration 0 = continuous → use 3 second intervals (faster beacon updates)
-    uint32_t scanDuration = (duration == 0) ? 3 : (duration / 1000);
+    // OPTIMIERT: Längere Scan-Intervalle (10s statt 3s) = weniger Restarts = stabiler
+    // Duration 0 = continuous → use 10 second intervals (from config.h BLE_SCAN_DURATION)
+    uint32_t scanDuration = (duration == 0) ? 10 : (duration / 1000);
     
-    Serial.printf("[BLE] Calling pBLEScan->start(%u, true)...\n", scanDuration);
+    Serial.printf("[BLE] Calling pBLEScan->start(%u seconds, true)...\n", scanDuration);
     pBLEScan->start(scanDuration, true);  // true = non-blocking, restart on completion
     Serial.println("[BLE] start() returned successfully!");
 }

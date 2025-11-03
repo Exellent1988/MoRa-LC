@@ -44,15 +44,22 @@ void onBeaconDetected(const BeaconData& beacon) {
     TeamData* team = lapCounter.getTeamByBeacon(beacon.macAddress);
     
     if (!team) {
-        // Unknown beacon - silent
+        // Unknown beacon - silent (not assigned to any team)
         return;
     }
+    
+    // DEBUG: Show RSSI for assigned beacons during race
+    Serial.printf("[Race] Beacon %s (Team %u): RSSI=%d (Near=%d, Far=%d, Present=%d)\n",
+                 beacon.macAddress.c_str(), team->teamId, beacon.rssi, 
+                 lapRssiNear, lapRssiFar, beaconPresence[team->teamId]);
     
     // RSSI-based presence detection with hysteresis
     if (beacon.rssi > lapRssiNear) {
         // Beacon is NEAR (strong signal)
+        Serial.printf("[Race] Beacon NEAR! Present before: %d\n", beaconPresence[team->teamId]);
         if (!beaconPresence[team->teamId]) {
             // Was away, now near → count lap!
+            Serial.printf("[Race] Attempting to record lap for Team %u...\n", team->teamId);
             if (lapCounter.recordLap(team->teamId, beacon.lastSeen)) {
                 Serial.printf("[Lap] ✅ Team %u (%s): Lap %u\n",
                              team->teamId, team->teamName.c_str(), team->lapCount);
@@ -296,20 +303,35 @@ void loop() {
     // NOTE: Log levels are set once in setup() and should NOT be changed during runtime
     // Calling esp_log_level_set() here causes blocking and UI freezes!
     
-    // Auto-refresh beacon screens while scanning (from old variant - prevents freezing)
-    // CRITICAL: Must call screen draw functions directly, not just set needsRedraw
-    // This prevents the UI from freezing during beacon scanning
+    // Smart beacon screen refresh - nur wenn sich was geändert hat!
+    // OPTIMIERT: Keine Vollbild-Refreshes mehr, nur bei tatsächlichen Änderungen
     if (bleScanner.isScanning()) {
         if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN || 
             uiState.currentScreen == SCREEN_BEACON_LIST) {
             static uint32_t lastBeaconRefresh = 0;
-            if (millis() - lastBeaconRefresh > 500) {  // Refresh every 500ms (faster updates!)
-                // Direct screen redraw - EXACTLY like old variant
-                if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN) {
-                    drawTeamBeaconAssignScreen();
-                } else if (uiState.currentScreen == SCREEN_BEACON_LIST) {
-                    drawBeaconListScreen();
+            if (millis() - lastBeaconRefresh > 1000) {  // Check every 1 second (nicht 500ms!)
+                auto beacons = bleScanner.getBeacons();
+                
+                // Change Detection: Hash aus Beacon-Count + RSSI-Summe
+                uint32_t currentHash = beacons.size() * 1000;  // Basis: Anzahl
+                for (const auto& beacon : beacons) {
+                    currentHash += abs(beacon.rssi);  // RSSI-Änderungen erkennen
                 }
+                
+                // Nur neu zeichnen wenn sich was geändert hat!
+                if (currentHash != uiState.lastBeaconHash || beacons.size() != uiState.lastBeaconCount) {
+                    Serial.printf("[UI] Beacon change detected (hash=%u, count=%u)\n", currentHash, beacons.size());
+                    
+                    if (uiState.currentScreen == SCREEN_TEAM_BEACON_ASSIGN) {
+                        drawTeamBeaconAssignScreen();
+                    } else if (uiState.currentScreen == SCREEN_BEACON_LIST) {
+                        drawBeaconListScreen();
+                    }
+                    
+                    uiState.lastBeaconHash = currentHash;
+                    uiState.lastBeaconCount = beacons.size();
+                }
+                
                 lastBeaconRefresh = millis();
             }
         }
@@ -324,10 +346,13 @@ void loop() {
         lastBeaconCleanup = millis();
     }
     
-    // Update race running screen if active
+    // Update race running screen if active (less frequent to reduce flicker)
     if (raceRunning && uiState.currentScreen == SCREEN_RACE_RUNNING) {
         static uint32_t lastRaceUpdate = 0;
-        if (millis() - lastRaceUpdate > 500) {  // Update every 500ms
+        // CRITICAL: Only update every 2 seconds to reduce flicker!
+        // Full screen refresh causes visible flicker
+        // TODO: Implement partial updates (only time/laps)
+        if (millis() - lastRaceUpdate > 2000) {  // Slower: 500ms -> 2000ms
             drawRaceRunningScreen();
             lastRaceUpdate = millis();
         }

@@ -41,6 +41,10 @@ struct UIState {
     // Results
     uint8_t resultsPage;  // 0 = current, 1-3 = historical
     
+    // Beacon List Cache (für Change-Detection)
+    uint32_t lastBeaconHash;
+    uint32_t lastBeaconCount;
+    
     // Touch
     uint16_t touchX;
     uint16_t touchY;
@@ -50,6 +54,7 @@ struct UIState {
     UIState() : currentScreen(SCREEN_HOME), previousScreen(SCREEN_HOME),
                 needsRedraw(true), editingTeamId(0), editingTeamName(""),
                 scrollOffset(0), raceName("Rennen"), raceDuration(60),
+                lastBeaconHash(0), lastBeaconCount(0),
                 touchX(0), touchY(0), touched(false), lastTouchTime(0),
                 resultsPage(0) {
         memset(selectedTeams, false, sizeof(selectedTeams));
@@ -60,6 +65,8 @@ struct UIState {
         currentScreen = newScreen;
         needsRedraw = true;
         scrollOffset = 0;
+        lastBeaconHash = 0; // Reset beacon cache
+        lastBeaconCount = 0;
     }
 };
 

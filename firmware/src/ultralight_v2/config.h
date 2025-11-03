@@ -44,7 +44,8 @@
 #define BLE_SCAN_INTERVAL 100
 #define BLE_SCAN_WINDOW   99
 #define BLE_RSSI_THRESHOLD -100
-#define BEACON_TIMEOUT    10000  // 10 Sekunden (vorher 3 Sek - zu kurz!)
+#define BEACON_TIMEOUT    15000  // ms - Beacon gilt als "verschwunden" nach 15s (optimiert)
+#define BLE_SCAN_DURATION 10     // seconds - Scan-Duration (länger = stabiler)
 #define BLE_UUID_PREFIX "c3:00:"
 
 // Lap Detection
@@ -73,10 +74,10 @@ static const uint16_t* TOUCH_CAL_DATA = nullptr;
 #define MAX_RACE_DURATION 7200000
 
 // UI - Größere Elemente für bessere Bedienbarkeit
-#define BUTTON_HEIGHT     50        // Größer: 42 -> 50
-#define BUTTON_MARGIN     10        // Mehr Abstand: 8 -> 10
-#define LIST_ITEM_HEIGHT  48        // Größer: 38 -> 48
-#define HEADER_HEIGHT     40        // Größer: 30 -> 40
+#define BUTTON_HEIGHT     45        // Größer: 42 -> 50
+#define BUTTON_MARGIN     8        // Mehr Abstand: 8 -> 10
+#define LIST_ITEM_HEIGHT  40        // Kompakter: 48 -> 40 (mehr Teams sichtbar!)
+#define HEADER_HEIGHT     35        // Größer: 30 -> 40
 #define TEXT_SIZE_NORMAL  2         // Standard Text-Größe
 #define TEXT_SIZE_LARGE   3         // Große Überschriften
 

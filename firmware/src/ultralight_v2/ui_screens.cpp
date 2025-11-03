@@ -70,23 +70,42 @@ void drawTeamsScreen() {
         lcd.setTextSize(TEXT_SIZE_NORMAL);
         lcd.drawString("Tippe unten zum Hinzufugen", SCREEN_WIDTH / 2, y + 90);
     } else {
+        // Calculate max visible teams (reserve space for + button: 35px)
+        int availableHeight = SCREEN_HEIGHT - 35 - BUTTON_MARGIN - y;
+        int maxVisible = availableHeight / (LIST_ITEM_HEIGHT + BUTTON_MARGIN);
+        
+        // Ensure at least 3 visible
+        if (maxVisible < 3) maxVisible = 3;
+        
+        bool needsScroll = (int)teams.size() > maxVisible;
+        
+        // Up arrow (ganz oben, klein)
+        if (needsScroll && uiState.scrollOffset > 0) {
+            lcd.fillTriangle(SCREEN_WIDTH - 25, y + 2, 
+                            SCREEN_WIDTH - 15, y + 12, 
+                            SCREEN_WIDTH - 35, y + 12, 
+                            COLOR_SECONDARY);
+        }
+        
+        // Display teams with scroll offset
         int displayCount = 0;
-        for (auto* team : teams) {
-            // Check if there's space for this team + button (60px for button)
-            if (y + LIST_ITEM_HEIGHT + BUTTON_MARGIN > SCREEN_HEIGHT - 60) break;
+        int startIndex = uiState.scrollOffset;
+        
+        for (size_t i = startIndex; i < teams.size() && displayCount < maxVisible; i++) {
+            auto* team = teams[i];
             
             // Team Item - kompakt aber lesbar
-            lcd.fillRoundRect(10, y, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT, 5, COLOR_BUTTON);
-            lcd.drawRoundRect(10, y, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT, 5, 0x4208);  // Border
+            lcd.fillRoundRect(10, y, SCREEN_WIDTH - 45, LIST_ITEM_HEIGHT, 5, COLOR_BUTTON);
+            lcd.drawRoundRect(10, y, SCREEN_WIDTH - 45, LIST_ITEM_HEIGHT, 5, 0x4208);
             
-            // Team Name - kompakt
+            // Team Name
             lcd.setTextColor(COLOR_BUTTON_TEXT);
             lcd.setTextSize(TEXT_SIZE_NORMAL);
             lcd.setCursor(15, y + 6);
             lcd.printf("%u. %s", team->teamId, team->teamName.c_str());
             
-            // Beacon Info - kompakter
-            lcd.setTextSize(1);  // Smaller for beacon info
+            // Beacon Info
+            lcd.setTextSize(1);
             lcd.setCursor(15, y + 26);
             if (team->beaconUUID.length() > 0) {
                 lcd.printf("Beacon: %s", formatBeaconMAC(team->beaconUUID).c_str());
@@ -97,12 +116,24 @@ void drawTeamsScreen() {
             y += LIST_ITEM_HEIGHT + BUTTON_MARGIN;
             displayCount++;
         }
+        
+        // Down arrow (ganz unten, klein)
+        if (needsScroll && startIndex + displayCount < (int)teams.size()) {
+            lcd.fillTriangle(SCREEN_WIDTH - 25, y - 2, 
+                            SCREEN_WIDTH - 15, y - 12, 
+                            SCREEN_WIDTH - 35, y - 12, 
+                            COLOR_SECONDARY);
+        }
     }
     
-    // Add button
-    int btnY = SCREEN_HEIGHT - 60;
-    drawButton(BUTTON_MARGIN, btnY, SCREEN_WIDTH - 2*BUTTON_MARGIN, 
-              BUTTON_HEIGHT, "+ Neues Team", COLOR_SECONDARY);
+    // Add button - KLEIN, nur "+" Icon, ganz unten links
+    int btnSize = 35;  // Kompakt: 35x35px
+    int btnY = SCREEN_HEIGHT - btnSize;  // Ganz unten, kein Rand
+    lcd.fillRoundRect(2, btnY, btnSize, btnSize, 8, COLOR_SECONDARY);
+    lcd.setTextColor(COLOR_BUTTON_TEXT);
+    lcd.setTextSize(3);  // Groß für "+"
+    lcd.setTextDatum(MC_DATUM);
+    lcd.drawString("+", 2 + btnSize/2, btnY + btnSize/2);
 }
 
 void drawTeamEditScreen() {
@@ -460,11 +491,20 @@ void drawRaceRunningScreen() {
         pos++;
     }
     
-    // Buttons - größer
-    int btnY = SCREEN_HEIGHT - 60;
-    int btnW = (SCREEN_WIDTH - BUTTON_MARGIN * 3) / 2;
-    drawButton(BUTTON_MARGIN, btnY, btnW, BUTTON_HEIGHT, "Pause", COLOR_WARNING);
-    drawButton(BUTTON_MARGIN * 2 + btnW, btnY, btnW, BUTTON_HEIGHT, "Stop", COLOR_DANGER);
+    // Buttons - KLEIN in Ecken, ganz am Rand mit Icons
+    int btnSize = 40;  // Kompakter: 40x40px
+    int btnY = SCREEN_HEIGHT - btnSize - 2;  // Näher am Rand: 2px
+    
+    // Pause button (links unten) - Icon: ||
+    lcd.fillRoundRect(2, btnY, btnSize, btnSize, 6, COLOR_WARNING);
+    lcd.setTextColor(COLOR_BUTTON_TEXT);
+    lcd.setTextSize(2);  // Mittel für Icon
+    lcd.setTextDatum(MC_DATUM);
+    lcd.drawString("||", 2 + btnSize/2, btnY + btnSize/2);
+    
+    // Stop button (rechts unten) - Icon: ◼
+    lcd.fillRoundRect(SCREEN_WIDTH - btnSize - 2, btnY, btnSize, btnSize, 6, COLOR_DANGER);
+    lcd.fillRect(SCREEN_WIDTH - btnSize - 2 + 12, btnY + 12, 16, 16, COLOR_BUTTON_TEXT);
 }
 
 void drawRacePausedScreen() {
@@ -759,15 +799,35 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
         return;
     }
     
-    // Team items (can click to edit)
     auto teams = lapCounter.getAllTeams();
     int itemY = HEADER_HEIGHT + 10;
-    int itemNum = 0;
     
-    for (auto* team : teams) {
-        if (itemNum >= 3) break;  // Max 3 visible
+    // Calculate max visible
+    int availableHeight = SCREEN_HEIGHT - 35 - BUTTON_MARGIN - itemY;
+    int maxVisible = availableHeight / (LIST_ITEM_HEIGHT + BUTTON_MARGIN);
+    if (maxVisible < 3) maxVisible = 3;
+    
+    bool needsScroll = (int)teams.size() > maxVisible;
+    
+    // Up arrow touch (ganz oben, rechts) - scroll one PAGE up
+    if (needsScroll && uiState.scrollOffset > 0) {
+        if (isTouchInRect(x, y, SCREEN_WIDTH - 40, itemY, 30, 15)) {
+            // Scroll page up (by maxVisible items)
+            uiState.scrollOffset -= maxVisible;
+            if (uiState.scrollOffset < 0) uiState.scrollOffset = 0;
+            uiState.needsRedraw = true;
+            return;
+        }
+    }
+    
+    // Team items with scroll offset
+    int displayCount = 0;
+    int startIndex = uiState.scrollOffset;
+    
+    for (size_t i = startIndex; i < teams.size() && displayCount < maxVisible; i++) {
+        auto* team = teams[i];
         
-        if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 20, LIST_ITEM_HEIGHT)) {
+        if (isTouchInRect(x, y, 10, itemY, SCREEN_WIDTH - 45, LIST_ITEM_HEIGHT)) {
             // Edit this team
             uiState.editingTeamId = team->teamId;
             uiState.editingTeamName = team->teamName;
@@ -775,13 +835,27 @@ void handleTeamsTouch(uint16_t x, uint16_t y) {
             return;
         }
         
-        itemY += LIST_ITEM_HEIGHT + 5;
-        itemNum++;
+        itemY += LIST_ITEM_HEIGHT + BUTTON_MARGIN;
+        displayCount++;
     }
     
-    // Add button
-    int btnY = SCREEN_HEIGHT - 60;
-    if (isTouchInRect(x, y, BUTTON_MARGIN, btnY, SCREEN_WIDTH - 2*BUTTON_MARGIN, BUTTON_HEIGHT)) {
+    // Down arrow touch (ganz unten, rechts) - scroll one PAGE down
+    if (needsScroll && startIndex + displayCount < (int)teams.size()) {
+        if (isTouchInRect(x, y, SCREEN_WIDTH - 40, itemY - 15, 30, 15)) {
+            // Scroll page down (by maxVisible items)
+            uiState.scrollOffset += maxVisible;
+            // Don't scroll past last item
+            int maxOffset = teams.size() - maxVisible;
+            if (uiState.scrollOffset > maxOffset) uiState.scrollOffset = maxOffset;
+            uiState.needsRedraw = true;
+            return;
+        }
+    }
+    
+    // Add button (klein, ganz unten links)
+    int btnSize = 35;
+    int btnY = SCREEN_HEIGHT - btnSize;  // Ganz unten
+    if (isTouchInRect(x, y, 2, btnY, btnSize, btnSize)) {
         if (lapCounter.getTeamCount() >= MAX_TEAMS) {
             showMessage("Fehler", "Maximale Teams erreicht", COLOR_DANGER);
         } else {
@@ -1093,23 +1167,21 @@ void handleRaceSetupTouch(uint16_t x, uint16_t y) {
         // Save race config
         persistence.saveConfig(currentRaceName, uiState.raceDuration);
         
-        // Start data logging
-        if (dataLogger.isReady()) {
-            dataLogger.startNewRace(currentRaceName);
-        }
-        
-        // Start BLE scanning
-        if (!bleScanner.isScanning()) {
-            bleScanner.startScan(0);
-        }
-        
         // Reset all teams
         lapCounter.reset();
         
         // Reset beacon presence
         beaconPresence.clear();
         
+        // CRITICAL: Change screen FIRST for instant UI response!
         uiState.changeScreen(SCREEN_RACE_RUNNING);
+        
+        // THEN start logging/scanning (in background - don't block UI!)
+        if (dataLogger.isReady()) {
+            dataLogger.startNewRace(currentRaceName);
+        }
+        
+        // BLE scanning will auto-start in loop() - no need to block here
         
         Serial.println("\n=== RACE STARTED ===");
         Serial.printf("Name: %s\n", currentRaceName.c_str());
@@ -1119,19 +1191,19 @@ void handleRaceSetupTouch(uint16_t x, uint16_t y) {
 }
 
 void handleRaceRunningTouch(uint16_t x, uint16_t y) {
-    int btnY = SCREEN_HEIGHT - 60;
-    int btnW = (SCREEN_WIDTH - BUTTON_MARGIN * 3) / 2;
+    int btnSize = 40;
+    int btnY = SCREEN_HEIGHT - btnSize - 2;
     
-    // Pause button
-    if (isTouchInRect(x, y, BUTTON_MARGIN, btnY, btnW, BUTTON_HEIGHT)) {
+    // Pause button (links unten)
+    if (isTouchInRect(x, y, 2, btnY, btnSize, btnSize)) {
         raceRunning = false;
         uiState.changeScreen(SCREEN_RACE_PAUSED);
         Serial.println("\n=== RACE PAUSED ===");
         return;
     }
     
-    // Stop button
-    if (isTouchInRect(x, y, BUTTON_MARGIN * 2 + btnW, btnY, btnW, BUTTON_HEIGHT)) {
+    // Stop button (rechts unten)
+    if (isTouchInRect(x, y, SCREEN_WIDTH - btnSize - 2, btnY, btnSize, btnSize)) {
         raceRunning = false;
         uiState.changeScreen(SCREEN_RACE_RESULTS);
         
