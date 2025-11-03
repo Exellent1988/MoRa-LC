@@ -238,6 +238,114 @@ String DataLogger::getCurrentRaceFile() {
     return currentRaceFile;
 }
 
+bool DataLogger::formatSD() {
+    if (!initialized) {
+        Serial.println("[DataLogger] ERROR: SD card not initialized");
+        return false;
+    }
+    
+    Serial.println("[DataLogger] WARNING: Formatting SD card - ALL DATA WILL BE LOST!");
+    
+    // Close any open files
+    currentRaceFile = "";
+    
+    // Note: ESP32 SD library doesn't support format directly
+    // We need to use SDFat library or delete all files
+    // For now, we'll delete all files in /races directory
+    
+    File root = SD.open("/");
+    if (!root) {
+        Serial.println("[DataLogger] ERROR: Cannot open root directory");
+        return false;
+    }
+    
+    // Delete all files recursively
+    deleteAllFiles("/");
+    
+    // Recreate races directory
+    if (!SD.exists("/races")) {
+        SD.mkdir("/races");
+    }
+    
+    Serial.println("[DataLogger] SD card 'formatted' (all files deleted)");
+    return true;
+}
+
+void DataLogger::deleteAllFiles(const String& dirPath) {
+    File dir = SD.open(dirPath.c_str());
+    if (!dir || !dir.isDirectory()) {
+        return;
+    }
+    
+    File file = dir.openNextFile();
+    while (file) {
+        String filePath = String(file.name());
+        if (file.isDirectory()) {
+            deleteAllFiles(filePath);
+            SD.rmdir(filePath.c_str());
+        } else {
+            SD.remove(filePath.c_str());
+            Serial.printf("[DataLogger] Deleted: %s\n", filePath.c_str());
+        }
+        file = dir.openNextFile();
+    }
+    dir.close();
+}
+
+String DataLogger::getRaceFileList(uint8_t maxFiles) {
+    if (!initialized) {
+        return "";
+    }
+    
+    String fileList = "";
+    File dir = SD.open("/races");
+    if (!dir || !dir.isDirectory()) {
+        return "";
+    }
+    
+    // Collect all CSV files with their timestamps
+    struct FileInfo {
+        String name;
+        unsigned long timestamp;
+    };
+    
+    // Use simple array (max 20 files)
+    FileInfo files[20];
+    uint8_t fileCount = 0;
+    
+    File file = dir.openNextFile();
+    while (file && fileCount < 20) {
+        String fileName = String(file.name());
+        if (fileName.endsWith(".csv")) {
+            files[fileCount].name = fileName;
+            files[fileCount].timestamp = file.getLastWrite();
+            fileCount++;
+        }
+        file = dir.openNextFile();
+    }
+    dir.close();
+    
+    // Sort by timestamp (newest first) - simple bubble sort
+    for (uint8_t i = 0; i < fileCount - 1; i++) {
+        for (uint8_t j = 0; j < fileCount - i - 1; j++) {
+            if (files[j].timestamp < files[j + 1].timestamp) {
+                FileInfo temp = files[j];
+                files[j] = files[j + 1];
+                files[j + 1] = temp;
+            }
+        }
+    }
+    
+    // Build result list
+    uint8_t count = (fileCount < maxFiles) ? fileCount : maxFiles;
+    for (uint8_t i = 0; i < count; i++) {
+        if (i > 0) fileList += "\n";
+        fileList += files[i].name;
+    }
+    
+    return fileList;
+}
+
 // ============================================================
 // Private Helper
 // ============================================================
