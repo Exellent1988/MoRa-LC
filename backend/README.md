@@ -34,6 +34,12 @@ Server laeuft auf `http://localhost:8000`
 - API Docs: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+### Tests
+
+```bash
+pytest backend/tests
+```
+
 ## Projektstruktur
 
 ```
