@@ -1,5 +1,6 @@
 #include "data_logger_service.h"
 #include "../hardware/sd_card.h"
+#include <SD.h>
 #include <SdFat.h>
 #include <Arduino.h>
 
@@ -43,16 +44,31 @@ bool DataLoggerService::createRaceFile(const String& raceName) {
     char filename[64];
     snprintf(filename, sizeof(filename), "/races/race_%lu.csv", millis());
     
-    // TODO: Use SDCard interface to create file
-    // For now, just set the name
+    // Ensure /races directory exists
+    if (!_sdCard->exists("/races")) {
+        if (!_sdCard->mkdir("/races")) {
+            Serial.println("[DataLogger] ERROR: Failed to create /races directory");
+            return false;
+        }
+    }
+    
+    // Use Arduino SD library to create file
+    _raceFile = SD.open(filename, FILE_WRITE);
+    if (!_raceFile) {
+        Serial.printf("[DataLogger] ERROR: Failed to create file: %s\n", filename);
+        return false;
+    }
+    
     Serial.printf("[DataLogger] Race file created: %s\n", filename);
     
     return true;
 }
 
 void DataLoggerService::closeRaceFile() {
-    if (_raceFile.isOpen()) {
+    if (_raceFile) {
+        _raceFile.flush();
         _raceFile.close();
+        Serial.println("[DataLogger] Race file closed");
     }
     _currentRaceName = "";
 }
@@ -116,13 +132,19 @@ void DataLoggerService::flushQueue() {
 }
 
 bool DataLoggerService::writeEntry(const LogEntry& entry) {
-    if (!_raceFile.isOpen()) return false;
+    if (!_raceFile) return false;
     
     // Write to file
-    _raceFile.print(entry.data.c_str());
-    Serial.printf("[DataLogger] %s", entry.data.c_str());
+    size_t written = _raceFile.print(entry.data.c_str());
+    _raceFile.flush();  // Ensure data is written to SD card
     
-    return true;
+    if (written > 0) {
+        Serial.printf("[DataLogger] Wrote: %s", entry.data.c_str());
+        return true;
+    } else {
+        Serial.println("[DataLogger] ERROR: Failed to write entry");
+        return false;
+    }
 }
 
 String DataLoggerService::formatLogLine(const LogEntry& entry) const {

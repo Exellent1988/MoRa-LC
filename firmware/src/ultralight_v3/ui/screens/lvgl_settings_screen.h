@@ -8,6 +8,7 @@
 class LVGLNavigation;
 class PersistenceService;
 class DataLoggerService;
+class LapCounterService;
 
 /**
  * Settings Screen (LVGL8)
@@ -15,7 +16,7 @@ class DataLoggerService;
  */
 class LVGLSettingsScreen : public LVGLBaseScreen {
 public:
-    LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence = nullptr, DataLoggerService* dataLogger = nullptr);
+    LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence = nullptr, DataLoggerService* dataLogger = nullptr, LapCounterService* lapCounter = nullptr);
     virtual ~LVGLSettingsScreen();
     
     void onEnter() override;
@@ -29,6 +30,7 @@ private:
     LVGLNavigation* _navigation;
     PersistenceService* _persistence;
     DataLoggerService* _dataLogger;
+    LapCounterService* _lapCounter;
     lv_obj_t* _list;
     
     // Event handlers

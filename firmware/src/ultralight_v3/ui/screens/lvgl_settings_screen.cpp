@@ -2,13 +2,15 @@
 #include "../navigation_lvgl.h"
 #include "../../services/persistence_service.h"
 #include "../../services/data_logger_service.h"
+#include "../../services/lap_counter_service.h"
 #include <Arduino.h>
 
-LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger)
+LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger, LapCounterService* lapCounter)
     : LVGLBaseScreen(lvglDisplay)
     , _navigation(nullptr)
     , _persistence(persistence)
     , _dataLogger(dataLogger)
+    , _lapCounter(lapCounter)
     , _list(nullptr) {
 }
 
@@ -90,19 +92,39 @@ void LVGLSettingsScreen::settingsItemEventHandler(lv_event_t* e) {
 
 void LVGLSettingsScreen::handleBLESettings() {
     Serial.println("[LVGLSettings] BLE Settings clicked");
-    // TODO: Open BLE settings dialog/screen
-    // For now, just show message
+    
+    // Show BLE settings info (read-only for now)
+    // In a full implementation, this would open a dialog with adjustable settings
+    
+    Serial.println("[LVGLSettings] BLE Configuration:");
+    Serial.printf("  - Scan Interval: %d ms\n", BLE_SCAN_INTERVAL);
+    Serial.printf("  - Scan Window: %d ms\n", BLE_SCAN_WINDOW);
+    Serial.printf("  - RSSI Threshold: %d dBm\n", BLE_RSSI_THRESHOLD);
+    Serial.printf("  - UUID Filter: %s\n", BLE_UUID_PREFIX);
+    Serial.printf("  - Beacon Timeout: %d ms\n", BEACON_TIMEOUT);
+    
+    // TODO: Implement adjustable BLE settings with LVGL dialog
+    // For now, settings are configured via config.h at compile time
 }
 
 void LVGLSettingsScreen::handleSaveData() {
     Serial.println("[LVGLSettings] Save Data clicked");
-    // Note: Teams need to be saved via LapCounterService
-    // This is just a placeholder - actual save would need LapCounterService reference
-    if (_persistence) {
-        Serial.println("[LVGLSettings] Data save triggered");
-        // TODO: Get LapCounterService reference and call saveTeams()
-    } else {
+    
+    if (!_persistence) {
         Serial.println("[LVGLSettings] ERROR: PersistenceService not available");
+        return;
+    }
+    
+    if (!_lapCounter) {
+        Serial.println("[LVGLSettings] ERROR: LapCounterService not available");
+        return;
+    }
+    
+    // Save teams to persistent storage
+    if (_lapCounter->saveTeams(_persistence)) {
+        Serial.println("[LVGLSettings] Teams saved successfully");
+    } else {
+        Serial.println("[LVGLSettings] ERROR: Failed to save teams");
     }
 }
 
