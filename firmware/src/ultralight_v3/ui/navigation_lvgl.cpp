@@ -43,7 +43,25 @@ void LVGLNavigation::transitionToScreen(LVGLBaseScreen* newScreen, bool isBackNa
     if (!isBackNavigation) {
         // Forward navigation: push current screen to stack and set as previous
         if (_currentScreen) {
-            _navigationStack.push_back(_currentScreen);
+            // Check if screen already exists in stack (prevent duplicates)
+            bool alreadyInStack = false;
+            for (const auto& screen : _navigationStack) {
+                if (screen == _currentScreen) {
+                    alreadyInStack = true;
+                    Serial.println("[LVGLNavigation] WARNING: Screen already in stack, not adding duplicate");
+                    break;
+                }
+            }
+            
+            // Only add if not a duplicate and stack not at limit
+            if (!alreadyInStack) {
+                if (_navigationStack.size() >= MAX_NAVIGATION_STACK_DEPTH) {
+                    Serial.printf("[LVGLNavigation] WARNING: Navigation stack at limit (%d), removing oldest entry\n", MAX_NAVIGATION_STACK_DEPTH);
+                    _navigationStack.erase(_navigationStack.begin());
+                }
+                _navigationStack.push_back(_currentScreen);
+                Serial.printf("[LVGLNavigation] Stack size: %zu\n", _navigationStack.size());
+            }
         }
         _previousScreen = _currentScreen;
     } else {
@@ -69,7 +87,7 @@ void LVGLNavigation::transitionToScreen(LVGLBaseScreen* newScreen, bool isBackNa
 
 void LVGLNavigation::goBack() {
     if (_previousScreen) {
-        Serial.printf("[LVGLNavigation] Going back to previous screen: %p\n", _previousScreen);
+        Serial.printf("[LVGLNavigation] Going back to previous screen: %p (stack size: %zu)\n", _previousScreen, _navigationStack.size());
         LVGLBaseScreen* targetScreen = _previousScreen;
         // Save the screen we're currently on (for potential future use)
         LVGLBaseScreen* currentBeforeBack = _currentScreen;

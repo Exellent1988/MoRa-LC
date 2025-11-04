@@ -34,6 +34,7 @@
 #include "ui/screens/lvgl_beacon_assign_screen.h"
 #include "ui/screens/lvgl_team_edit_screen.h"
 #include "ui/screens/lvgl_test_screen.h"
+#include "ui/widgets/dialog_manager.h"
 #endif
 
 // Global instances
@@ -154,6 +155,10 @@ void setup() {
     // 4. Initialize LVGL Navigation
     lvglNavigation.begin(&lvglDisplay);
     Serial.println("[Main] LVGL Navigation initialized");
+    
+    // 4b. Initialize Dialog Manager with root screen
+    DialogManager::getInstance()->begin(lvglDisplay.getScreen());
+    Serial.println("[Main] Dialog Manager initialized");
     
     // 5. Set up screen navigation
     lvglHomeScreen.setNavigation(&lvglNavigation);
