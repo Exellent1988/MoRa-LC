@@ -1,35 +1,46 @@
 # MoRa-LC - Implementierungs-Status
 
-**Letztes Update:** UltraLight komplett fertig, Dokumentation aktualisiert  
-**Version:** 0.1.0 (Prototyp)
+**Letztes Update:** UltraLight v3 komplett fertiggestellt  
+**Version:** 3.0.0 (Clean Architecture Rewrite)
 
 ## ✅ Komplett fertig
 
-### UltraLight Variante (100%)
+### UltraLight v3 Variante (100%)
+**Clean Architecture Rewrite mit LVGL8**
+
 - ✅ **Hardware-Setup** - PlatformIO Config, CheapYellow Display
-- ✅ **Shared Libraries** - BLEScanner, LapCounter, DataLogger
-- ✅ **Firmware** - Main Loop, Init, BLE Integration
-- ✅ **UI Screens** - Alle 9 Screens implementiert:
+- ✅ **Core System** - SystemManager, TaskManager, MemoryManager
+- ✅ **Hardware-Abstraktionen** - Display/LVGL, Touch, SD Card, BLE (NimBLE/ESP32/ESP-IDF)
+- ✅ **Services** - BeaconService, LapCounterService, PersistenceService, DataLoggerService
+- ✅ **UI Screens (LVGL8)** - Alle Screens implementiert:
   - Home Screen (Hauptmenü)
-  - Teams Screen (Liste)
+  - Teams Screen (Liste mit Lösch-Dialog)
   - Team Edit Screen (Name, Beacon)
   - Beacon Assign Screen (RSSI-Proximity)
-  - Race Setup Screen (Name, Dauer)
-  - Race Running Screen (Live-Rangliste)
-  - Race Paused Screen
-  - Race Results Screen (Medaillen)
-  - Settings Screen
-- ✅ **Touch Handler** - Alle Buttons funktional
-- ✅ **BLE Scanner** - Beacon-Erkennung, RSSI-Proximity
-- ✅ **Lap Counter** - Automatische Rundenzählung
-- ✅ **Data Logger** - SD-Karte CSV Export
-- ✅ **On-Screen Keyboard** - Vollständige Text-Eingabe
-- ✅ **Number Picker** - Zahlen-Eingabe für Dauer/Einstellungen
+  - Race Setup Screen (Dauer)
+  - Race Running Screen (Live-Rangliste, Timer)
+  - Race Results Screen (Leaderboard mit Zeiten)
+  - Settings Screen (BLE Settings, Save Data, Reset)
+  - BLE Test Screen
+- ✅ **Navigation System** - LVGL-basierte Navigation zwischen Screens
+- ✅ **Touch Handler** - Vollständig integriert
+- ✅ **BLE Scanner** - Beacon-Erkennung, RSSI-Proximity, Race Mode
+- ✅ **Lap Counter** - Automatische Rundenzählung mit Best-Lap-Zeiten
+- ✅ **Data Logger** - SD-Karte CSV Export mit SdFat
 - ✅ **Persistenz** - Teams bleiben nach Neustart erhalten (NVS)
-- ✅ **Beacon-Liste Screen** - Auswahl aus Liste (Methode 2)
-- ✅ **Dokumentation** - User-Guide komplett
+- ✅ **Dialog-System** - LVGL Dialoge für Bestätigungen und Meldungen
+- ✅ **Font-System** - Konsistente Font-Verwendung (Montserrat)
+- ✅ **Theme-System** - Einheitliche Farben und Spacing
 
 **Status:** Ready für Hardware-Test! 🎉
+
+**Neue Features gegenüber v2:**
+- Clean Architecture mit klarer Trennung Core/Hardware/Services/UI
+- LVGL8 für moderne UI mit besserer Performance
+- Konsistentes Font- und Theme-System
+- Dialog-System für bessere UX
+- Verbesserte SD Card Integration mit SdFat
+- Vollständige Navigation zwischen allen Screens
 
 ### Shared Libraries (100%)
 - ✅ BLEScanner - iBeacon Parsing, RSSI-Distance, Filtering
@@ -88,35 +99,40 @@
 
 **Projekt gesamt:** ~35%
 
-**UltraLight:** 100% ✅ (Ready for Testing!)  
+**UltraLight v3:** 100% ✅ (Ready for Testing!)  
+**UltraLight v2:** 100% ✅ (Legacy, nicht mehr aktiv entwickelt)  
 **FullBlown:** ~8% (Nur Protokoll & Libs)
 
 ## 🎯 Nächste Schritte
 
-### Sofort (UltraLight Field-Test)
+### Sofort (UltraLight v3 Field-Test)
 
 1. **Hardware besorgen:**
-   - 1x CheapYellow Display
+   - 1x CheapYellow Display (ESP32-2432S028)
    - 3-5x Xiaomi Mi Beacons
    - 1x Powerbank
    - 1x SD-Karte (FAT32)
 
 2. **Firmware flashen:**
    ```bash
-   cd firmware/ultralight
-   pio run -t upload
+   cd firmware
+   pio run -e ultralight_v3 -t upload
    ```
 
 3. **Test-Szenario:**
-   - 3 Teams anlegen
+   - 3 Teams anlegen (Settings → Teams)
    - Beacons zuordnen (RSSI-Methode)
-   - Kurzes Testrennen (5 Min)
-   - Prüfen: Rundenzählung, SD-Log, UI
+   - Kurzes Testrennen starten (Race Setup → Start)
+   - Prüfen: Rundenzählung, SD-Log, UI, Navigation
+   - Teams speichern (Settings → Save Data)
+   - Ergebnisse ansehen (Race Results Screen)
 
 4. **Feedback sammeln:**
    - Funktioniert Beacon-Erkennung zuverlässig?
-   - UI verständlich?
-   - Touch responsive genug?
+   - UI verständlich und responsive?
+   - Touch funktioniert korrekt?
+   - SD Card Logging funktioniert?
+   - Navigation zwischen Screens flüssig?
    - Fehler/Bugs?
 
 ### Danach (FullBlown Start)
@@ -141,15 +157,19 @@ Wenn UltraLight funktioniert → FullBlown Firmware:
 
 ## 🐛 Bekannte Einschränkungen
 
-### UltraLight
-1. ✅ **Text-Eingabe:** On-Screen Keyboard implementiert
-2. ✅ **Zahlen-Eingabe:** Number Picker implementiert
-3. ✅ **Persistenz:** Teams bleiben nach Neustart erhalten (NVS)
-4. ✅ **Beacon-Liste:** Methode 2 (Liste auswählen) implementiert
-5. **Scroll-Funktion:** Teams-Liste zeigt nur 3 Teams (kein Scroll)
-   - Workaround: Teams löschen oder neu anordnen
-6. **Beacon-Anzahl:** Beacon-Liste zeigt max. 8 Beacons
-   - Workaround: Beacons einzeln scannen
+### UltraLight v3
+1. ✅ **UI System:** LVGL8 mit moderner Touch-UI
+2. ✅ **Font-System:** Konsistente Font-Verwendung (Montserrat)
+3. ✅ **Dialog-System:** Bestätigungs-Dialoge für kritische Aktionen
+4. ✅ **Persistenz:** Teams bleiben nach Neustart erhalten (NVS)
+5. ✅ **SD Card Integration:** SdFat-basiertes Logging mit CSV-Export
+6. ✅ **Navigation:** Vollständige Navigation zwischen allen Screens
+7. ✅ **Race Results:** Leaderboard mit Best-Lap-Zeiten
+8. ✅ **Settings:** BLE Settings, Teams speichern, Reset mit Bestätigung
+9. **Scroll-Funktion:** Teams-Liste zeigt max. 4 Teams gleichzeitig
+   - LVGL List unterstützt automatisches Scrolling
+10. **Beacon-Anzahl:** Beacon-Liste zeigt alle erkannten Beacons
+    - LVGL List unterstützt automatisches Scrolling
 
 ### Shared Libraries
 - BLEScanner: Keine Multi-Beacon gleichzeitig
@@ -162,17 +182,20 @@ Wenn UltraLight funktioniert → FullBlown Firmware:
 
 ## 🚀 Was jetzt funktioniert
 
-Das **komplette UltraLight System** ist implementiert:
+Das **komplette UltraLight v3 System** ist implementiert:
 
-1. ✅ Display zeigt Menüs
-2. ✅ Touch-Navigation funktioniert
-3. ✅ Teams können angelegt werden
+1. ✅ Display zeigt moderne LVGL8 UI
+2. ✅ Touch-Navigation funktioniert flüssig
+3. ✅ Teams können angelegt, bearbeitet und gelöscht werden (mit Bestätigung)
 4. ✅ Beacons können per RSSI zugeordnet werden
-5. ✅ Rennen können gestartet werden
-6. ✅ Rundenzählung läuft automatisch
-7. ✅ Live-Rangliste wird angezeigt
-8. ✅ Ergebnisse werden auf SD gespeichert
-9. ✅ Pause/Resume/Stop funktioniert
+5. ✅ Rennen können gestartet werden (mit Timer und verbleibender Zeit)
+6. ✅ Rundenzählung läuft automatisch mit Best-Lap-Tracking
+7. ✅ Live-Rangliste wird während des Rennens angezeigt
+8. ✅ Ergebnisse werden auf SD gespeichert (CSV-Format in /races/)
+9. ✅ Pause/Resume/Stop funktioniert (Navigation zu Results beim Stop)
+10. ✅ Teams können gespeichert werden (Settings → Save Data)
+11. ✅ BLE Settings werden angezeigt (Settings → BLE Settings)
+12. ✅ Reset mit Bestätigungs-Dialog (Settings → Reset)
 
 **Theoretisch bereit für ersten echten Test!**
 
@@ -185,11 +208,11 @@ Das **komplette UltraLight System** ist implementiert:
 - Dokumentation parallel schreiben
 
 **Was noch verbessert werden kann:**
-- Mehr Abstraktionen (Button-Class statt manuelle Rects)
-- State-Machine für UI (aktuell switch-case)
+- Icon-System (aktuell Platzhalter-Symbole)
 - Touch-Kalibrierung beim ersten Start
-- Scroll-Funktion für lange Listen (Teams, Beacons)
-- Mehrere Beacons gleichzeitig scannen (aktuell: max. 10 gleichzeitig)
+- Farb-Kontraste auf Display testen (Hardware-Test nötig)
+- BLE Scan-Performance optimieren (Hardware-Test nötig)
+- Memory-Leaks prüfen (Hardware-Test nötig)
 
 **Für FullBlown:**
 - Früher mit Hardware-Tests starten

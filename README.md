@@ -233,13 +233,18 @@ Bei Fragen oder Problemen: [Issue erstellen](../../issues)
 
 **Aktueller Fortschritt:**
 - [x] Projekt-Setup & Planung
-- [x] **UltraLight Prototyp** - ✅ **Bereit zum Testen!**
-  - [x] On-Screen Keyboard & Number Picker
+- [x] **UltraLight v3** - ✅ **Bereit zum Testen!**
+  - [x] Clean Architecture Rewrite mit LVGL8
+  - [x] Vollständige UI mit allen Screens (Home, Teams, Race Setup/Running/Results, Settings)
+  - [x] Dialog-System für Bestätigungen
+  - [x] Konsistentes Font- und Theme-System
   - [x] Persistenz (Teams bleiben nach Neustart erhalten)
-  - [x] Vollständige Touch-UI mit allen Screens
   - [x] BLE Beacon Scanning & RSSI-basierte Rundenzählung
-  - [x] SD-Karte Logging (CSV Export)
+  - [x] SD-Karte Logging mit SdFat (CSV Export)
+  - [x] Navigation zwischen allen Screens
+  - [x] Settings: Teams speichern, BLE Settings, Reset
   - Siehe [UltraLight Build Guide](docs/ultralight-build.md)
+- [x] **UltraLight v2** - ✅ (Legacy, nicht mehr aktiv entwickelt)
 - [ ] FullBlown Basis-System
 - [ ] Field-Tests
 - [ ] Finale Features

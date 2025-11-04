@@ -15,17 +15,29 @@ Gemeinsame Module für beide Varianten:
 
 ### Firmware-Projekte
 
-#### UltraLight (`/ultralight/`)
+#### UltraLight v3 (`/ultralight_v3/`)
 CheapYellow Display Firmware für standalone Betrieb.
+**Clean Architecture Rewrite mit LVGL8**
 
 **Hardware:** ESP32-2432S028 (CheapYellow)
 
 **Features:**
-- TFT Touch Display (320x240)
-- BLE Scanner für Beacon-Erkennung
-- Team-Management UI
-- Rundenzählung & Zeiten
-- SD-Karte Logging
+- LVGL8 Touch Display UI (320x240)
+- BLE Scanner für Beacon-Erkennung (NimBLE/ESP32/ESP-IDF)
+- Team-Management UI mit Dialog-System
+- Rundenzählung & Zeiten mit Best-Lap-Tracking
+- SD-Karte Logging mit SdFat (CSV Export)
+- Konsistentes Font- und Theme-System
+- Vollständige Navigation zwischen Screens
+
+**Build:**
+```bash
+cd firmware
+pio run -e ultralight_v3 -t upload
+```
+
+#### UltraLight v2 (`/ultralight_v2/`)
+Legacy Version (nicht mehr aktiv entwickelt).
 
 #### FullBlown System
 
