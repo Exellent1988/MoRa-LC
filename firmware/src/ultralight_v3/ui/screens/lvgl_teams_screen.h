@@ -50,6 +50,10 @@ private:
     // Helper methods
     void updateTeamList();
     void showDeleteConfirmDialog(uint8_t teamId);
+    
+    // Static callbacks for dialog
+    static void deleteConfirmOkCallback(lv_event_t* e);
+    static void deleteConfirmCancelCallback(lv_event_t* e);
 };
 
 #endif // LVGL_TEAMS_SCREEN_H

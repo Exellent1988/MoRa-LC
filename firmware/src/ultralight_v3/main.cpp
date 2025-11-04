@@ -64,7 +64,7 @@ LVGLTeamsScreen lvglTeamsScreen(&lvglDisplay, &lapCounterService);
 LVGLRaceSetupScreen lvglRaceSetupScreen(&lvglDisplay);
 LVGLRaceRunningScreen lvglRaceRunningScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLRaceResultsScreen lvglRaceResultsScreen(&lvglDisplay, &lapCounterService);
-LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService);
+LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService, &lapCounterService);
 LVGLBeaconAssignScreen lvglBeaconAssignScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLTeamEditScreen lvglTeamEditScreen(&lvglDisplay, &lapCounterService);
 #endif

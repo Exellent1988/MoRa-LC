@@ -1,7 +1,11 @@
 #include "data_logger_service.h"
 #include "../hardware/sd_card.h"
+#include "../core/config.h"
 #include <SdFat.h>
 #include <Arduino.h>
+
+// SdFat instance (global, shared with SDCard class if needed)
+SdFat sdFat;
 
 DataLoggerService::DataLoggerService()
     : _sdCard(nullptr)
@@ -20,6 +24,22 @@ bool DataLoggerService::begin(SDCard* sdCard) {
     }
     
     _sdCard = sdCard;
+    
+    // Initialize SdFat if not already initialized
+    if (!sdFat.begin(SD_CS_PIN, SD_SCK_MHZ(50))) {
+        Serial.println("[DataLogger] ERROR: SdFat initialization failed");
+        return false;
+    }
+    
+    // Ensure /races directory exists
+    if (!sdFat.exists("/races")) {
+        if (!sdFat.mkdir("/races")) {
+            Serial.println("[DataLogger] ERROR: Failed to create /races directory");
+            return false;
+        }
+        Serial.println("[DataLogger] Created /races directory");
+    }
+    
     _initialized = true;
     
     Serial.println("[DataLogger] Initialized");
@@ -43,8 +63,12 @@ bool DataLoggerService::createRaceFile(const String& raceName) {
     char filename[64];
     snprintf(filename, sizeof(filename), "/races/race_%lu.csv", millis());
     
-    // TODO: Use SDCard interface to create file
-    // For now, just set the name
+    // Open file for writing (create if not exists, truncate if exists)
+    if (!_raceFile.open(&sdFat, filename, O_WRONLY | O_CREAT | O_TRUNC)) {
+        Serial.printf("[DataLogger] ERROR: Failed to create race file: %s\n", filename);
+        return false;
+    }
+    
     Serial.printf("[DataLogger] Race file created: %s\n", filename);
     
     return true;
@@ -120,6 +144,7 @@ bool DataLoggerService::writeEntry(const LogEntry& entry) {
     
     // Write to file
     _raceFile.print(entry.data.c_str());
+    _raceFile.flush();  // Ensure data is written immediately
     Serial.printf("[DataLogger] %s", entry.data.c_str());
     
     return true;

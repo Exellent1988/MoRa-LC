@@ -72,11 +72,13 @@ void LVGLRaceResultsScreen::updateResultsList() {
     for (TeamData* team : leaderboard) {
         char info[128];
         if (team->bestLapTime > 0) {
-            uint32_t seconds = team->bestLapTime / 1000;
-            uint32_t minutes = seconds / 60;
-            seconds %= 60;
-            snprintf(info, sizeof(info), "%u. %s\nLaps: %u | Best: %lu:%02lu", 
-                    rank, team->teamName.c_str(), team->lapCount, minutes, seconds);
+            uint32_t totalMs = team->bestLapTime;
+            uint32_t totalSeconds = totalMs / 1000;
+            uint32_t minutes = totalSeconds / 60;
+            uint32_t seconds = totalSeconds % 60;
+            uint32_t milliseconds = (totalMs % 1000) / 10;  // Centiseconds for display
+            snprintf(info, sizeof(info), "%u. %s\nLaps: %u | Best: %lu:%02lu.%02lu", 
+                    rank, team->teamName.c_str(), team->lapCount, minutes, seconds, milliseconds);
         } else {
             snprintf(info, sizeof(info), "%u. %s\nLaps: %u", 
                     rank, team->teamName.c_str(), team->lapCount);

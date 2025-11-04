@@ -2,6 +2,7 @@
 #include "lvgl_beacon_assign_screen.h"
 #include "lvgl_team_edit_screen.h"
 #include "../navigation_lvgl.h"
+#include "../widgets/lvgl_dialog.h"
 #include <Arduino.h>
 
 LVGLTeamsScreen::LVGLTeamsScreen(LVGLDisplay* lvglDisplay, LapCounterService* lapCounter)
@@ -151,18 +152,58 @@ void LVGLTeamsScreen::deleteTeamEventHandler(lv_event_t* e) {
 }
 
 void LVGLTeamsScreen::showDeleteConfirmDialog(uint8_t teamId) {
-    if (!_lapCounter) return;
+    if (!_lapCounter || !_screen) return;
     
     TeamData* team = _lapCounter->getTeam(teamId);
     if (!team) return;
     
     Serial.printf("[LVGLTeams] Showing delete confirmation for team %u: %s\n", teamId, team->teamName.c_str());
     
-    // Simple confirmation - delete directly for now
-    // TODO: Add proper LVGL dialog
-    if (_lapCounter->removeTeam(teamId)) {
-        Serial.printf("[LVGLTeams] Team %u deleted\n", teamId);
-        updateTeamList();
+    // Create confirmation dialog
+    LVGLDialog dialog(_screen);
+    
+    char message[128];
+    snprintf(message, sizeof(message), "Delete team:\n%s?", team->teamName.c_str());
+    
+    // Store teamId in a way we can access it in the callback
+    struct DeleteData {
+        LVGLTeamsScreen* screen;
+        uint8_t teamId;
+    };
+    DeleteData* deleteData = new DeleteData{this, teamId};
+    
+    dialog.showConfirm(
+        "Delete Team",
+        message,
+        "Delete",
+        "Cancel",
+        deleteConfirmOkCallback,
+        deleteConfirmCancelCallback,
+        deleteData
+    );
+}
+
+void LVGLTeamsScreen::deleteConfirmOkCallback(lv_event_t* e) {
+    struct DeleteData {
+        LVGLTeamsScreen* screen;
+        uint8_t teamId;
+    };
+    DeleteData* data = (DeleteData*)lv_event_get_user_data(e);
+    if (data && data->screen && data->screen->_lapCounter) {
+        if (data->screen->_lapCounter->removeTeam(data->teamId)) {
+            Serial.printf("[LVGLTeams] Team %u deleted\n", data->teamId);
+            data->screen->updateTeamList();
+        }
     }
+    delete data;
+}
+
+void LVGLTeamsScreen::deleteConfirmCancelCallback(lv_event_t* e) {
+    struct DeleteData {
+        LVGLTeamsScreen* screen;
+        uint8_t teamId;
+    };
+    DeleteData* data = (DeleteData*)lv_event_get_user_data(e);
+    delete data;
 }
 

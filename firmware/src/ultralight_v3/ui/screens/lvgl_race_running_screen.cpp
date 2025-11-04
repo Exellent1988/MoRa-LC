@@ -323,8 +323,7 @@ void LVGLRaceRunningScreen::stopBtnEventHandler(lv_event_t* e) {
     if (screen && screen->_navigation) {
         Serial.println("[LVGLRaceRunning] Stop button clicked");
         screen->stopRace();
-        // TODO: Navigate to results screen
-        screen->_navigation->goBack();
+        // Navigation to results screen is handled in stopRace()
     }
 }
 

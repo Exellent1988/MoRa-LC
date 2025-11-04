@@ -1,14 +1,18 @@
 #include "lvgl_settings_screen.h"
 #include "../navigation_lvgl.h"
+#include "../widgets/lvgl_dialog.h"
 #include "../../services/persistence_service.h"
 #include "../../services/data_logger_service.h"
+#include "../../services/lap_counter_service.h"
+#include "../../core/config.h"
 #include <Arduino.h>
 
-LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger)
+LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger, LapCounterService* lapCounter)
     : LVGLBaseScreen(lvglDisplay)
     , _navigation(nullptr)
     , _persistence(persistence)
     , _dataLogger(dataLogger)
+    , _lapCounter(lapCounter)
     , _list(nullptr) {
 }
 
@@ -90,31 +94,90 @@ void LVGLSettingsScreen::settingsItemEventHandler(lv_event_t* e) {
 
 void LVGLSettingsScreen::handleBLESettings() {
     Serial.println("[LVGLSettings] BLE Settings clicked");
-    // TODO: Open BLE settings dialog/screen
-    // For now, just show message
+    
+    if (!_screen) return;
+    
+    // Show BLE settings info dialog
+    LVGLDialog dialog(_screen);
+    
+    // Get BLE status info (simplified - just show that BLE is available)
+    char message[256];
+    snprintf(message, sizeof(message), 
+             "BLE Scanner:\n"
+             "Mode: Active\n"
+             "RSSI Threshold: %d dBm\n"
+             "Scan Interval: %d ms\n"
+             "\n"
+             "To configure BLE settings,\n"
+             "use config.h and rebuild.",
+             BLE_RSSI_THRESHOLD, BLE_SCAN_INTERVAL);
+    
+    dialog.show("BLE Settings", message, "OK", nullptr, nullptr);
 }
 
 void LVGLSettingsScreen::handleSaveData() {
     Serial.println("[LVGLSettings] Save Data clicked");
-    // Note: Teams need to be saved via LapCounterService
-    // This is just a placeholder - actual save would need LapCounterService reference
-    if (_persistence) {
-        Serial.println("[LVGLSettings] Data save triggered");
-        // TODO: Get LapCounterService reference and call saveTeams()
+    
+    if (!_screen) return;
+    
+    LVGLDialog dialog(_screen);
+    
+    if (_persistence && _lapCounter) {
+        if (_lapCounter->saveTeams(_persistence)) {
+            Serial.println("[LVGLSettings] Teams saved successfully");
+            dialog.show("Save Data", "Teams saved\nsuccessfully!", "OK", nullptr, nullptr);
+        } else {
+            Serial.println("[LVGLSettings] ERROR: Failed to save teams");
+            dialog.show("Save Data", "Failed to save teams.\nPlease try again.", "OK", nullptr, nullptr);
+        }
     } else {
-        Serial.println("[LVGLSettings] ERROR: PersistenceService not available");
+        Serial.println("[LVGLSettings] ERROR: PersistenceService or LapCounterService not available");
+        dialog.show("Save Data", "Services not available.", "OK", nullptr, nullptr);
     }
 }
 
 void LVGLSettingsScreen::handleReset() {
     Serial.println("[LVGLSettings] Reset clicked");
-    // TODO: Show confirmation dialog
-    if (_persistence) {
-        _persistence->clearAll();
+    
+    if (!_screen) return;
+    
+    // Show confirmation dialog
+    LVGLDialog dialog(_screen);
+    
+    struct ResetData {
+        LVGLSettingsScreen* screen;
+    };
+    ResetData* resetData = new ResetData{this};
+    
+    dialog.showConfirm(
+        "Reset All Data",
+        "This will delete all teams\nand settings.\n\nContinue?",
+        "Reset",
+        "Cancel",
+        resetConfirmOkCallback,
+        resetConfirmCancelCallback,
+        resetData
+    );
+}
+
+void LVGLSettingsScreen::resetConfirmOkCallback(lv_event_t* e) {
+    struct ResetData {
+        LVGLSettingsScreen* screen;
+    };
+    ResetData* data = (ResetData*)lv_event_get_user_data(e);
+    if (data && data->screen && data->screen->_persistence) {
+        data->screen->_persistence->clearAll();
         Serial.println("[LVGLSettings] All data cleared");
-    } else {
-        Serial.println("[LVGLSettings] ERROR: PersistenceService not available");
     }
+    delete data;
+}
+
+void LVGLSettingsScreen::resetConfirmCancelCallback(lv_event_t* e) {
+    struct ResetData {
+        LVGLSettingsScreen* screen;
+    };
+    ResetData* data = (ResetData*)lv_event_get_user_data(e);
+    delete data;
 }
 
 void LVGLSettingsScreen::backBtnEventHandler(lv_event_t* e) {
