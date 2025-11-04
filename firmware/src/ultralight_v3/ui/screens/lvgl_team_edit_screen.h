@@ -33,6 +33,7 @@ private:
     uint8_t _teamId;
     
     lv_obj_t* _nameTextArea;
+    lv_obj_t* _keyboard;
     lv_obj_t* _saveButton;
     lv_obj_t* _cancelButton;
     

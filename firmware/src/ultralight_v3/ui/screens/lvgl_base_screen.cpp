@@ -66,6 +66,13 @@ lv_obj_t* LVGLBaseScreen::createButton(const char* label, int x, int y, int w, i
     lv_obj_set_style_bg_color(btn, rgb565ToLVGL(Colors::BUTTON), 0);
     lv_obj_set_style_bg_color(btn, rgb565ToLVGL(Colors::BUTTON_PRESSED), LV_STATE_PRESSED);
     
+    // Remove borders, shadows, and outlines for better text readability
+    lv_obj_set_style_border_width(btn, 0, 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+    lv_obj_set_style_outline_width(btn, 0, 0);
+    lv_obj_set_style_outline_width(btn, 0, LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(btn, 0, LV_STATE_FOCUS_KEY);
+    
     if (event_cb) {
         lv_obj_add_event_cb(btn, event_cb, LV_EVENT_CLICKED, user_data);
     }
@@ -74,6 +81,9 @@ lv_obj_t* LVGLBaseScreen::createButton(const char* label, int x, int y, int w, i
         lv_obj_t* btnLabel = lv_label_create(btn);
         lv_label_set_text(btnLabel, label);
         lv_obj_set_style_text_color(btnLabel, rgb565ToLVGL(Colors::BUTTON_TEXT), 0);
+        
+        // Remove text outline/shadow for better readability
+        lv_obj_set_style_text_opa(btnLabel, LV_OPA_COVER, 0);
         
         // Use larger font for better readability
         #ifdef LV_FONT_MONTSERRAT_16
