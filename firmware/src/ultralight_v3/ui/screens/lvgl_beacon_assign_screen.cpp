@@ -33,14 +33,14 @@ void LVGLBeaconAssignScreen::onEnter() {
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header with back button
-    createHeader("Beacon zuordnen", true, backBtnEventHandler, this);
+    // Create header with back button (ASCII only)
+    createHeader("Assign Beacon", true, backBtnEventHandler, this);
     
-    // Instruction
+    // Instruction (ASCII only)
     TeamData* team = _lapCounter ? _lapCounter->getTeam(_teamId) : nullptr;
-    String instruction = "Beacon für Team auswählen";
+    String instruction = "Select Beacon for Team";
     if (team) {
-        instruction = "Beacon für: " + team->teamName;
+        instruction = "Beacon for: " + team->teamName;
     }
     
     _instructionLabel = createLabel(instruction.c_str(), Spacing::MD, HEADER_HEIGHT + Spacing::SM,
@@ -87,7 +87,7 @@ void LVGLBeaconAssignScreen::updateBeaconList() {
     std::vector<BeaconInfo> beacons = _beaconService->getBeacons();
     
     if (beacons.empty()) {
-        lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, "Keine Beacons gefunden");
+        lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, "No beacons found");
         lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }

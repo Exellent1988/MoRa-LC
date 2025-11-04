@@ -7,6 +7,7 @@ LVGLRaceRunningScreen::LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconSer
     , _navigation(nullptr)
     , _beaconService(beaconService)
     , _lapCounter(lapCounter)
+    , _raceResultsScreen(nullptr)
     , _timeLabel(nullptr)
     , _remainingLabel(nullptr)
     , _leaderboardList(nullptr)
@@ -53,8 +54,8 @@ void LVGLRaceRunningScreen::onEnter() {
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header (no back button during race, no umlauts)
-    createHeader("Rennen laeuft", false);
+    // Create header (no back button during race, ASCII only)
+    createHeader("Race Running", false);
     
     // Time display (large, centered)
     int timeY = HEADER_HEIGHT + Spacing::MD;
@@ -63,9 +64,9 @@ void LVGLRaceRunningScreen::onEnter() {
         lv_obj_set_style_text_align(_timeLabel, LV_TEXT_ALIGN_CENTER, 0);
     }
     
-    // Remaining time
+    // Remaining time (ASCII only)
     int remainingY = timeY + 60;
-    _remainingLabel = createLabel("Verbleibend: 00:00", 0, remainingY, SCREEN_WIDTH, 30, rgb565ToLVGL(Colors::TEXT_SECONDARY));
+    _remainingLabel = createLabel("Remaining: 00:00", 0, remainingY, SCREEN_WIDTH, 30, rgb565ToLVGL(Colors::TEXT_SECONDARY));
     if (_remainingLabel) {
         lv_obj_set_style_text_align(_remainingLabel, LV_TEXT_ALIGN_CENTER, 0);
     }
@@ -121,7 +122,7 @@ void LVGLRaceRunningScreen::update() {
     
     if (remaining != _lastDisplayedRemaining) {
         char buf[64];
-        snprintf(buf, sizeof(buf), "Verbleibend: %s", formatTime(remaining).c_str());
+        snprintf(buf, sizeof(buf), "Remaining: %s", formatTime(remaining).c_str());
         lv_label_set_text(_remainingLabel, buf);
         _lastDisplayedRemaining = remaining;
     }
@@ -138,12 +139,15 @@ void LVGLRaceRunningScreen::startRace(uint32_t durationMinutes) {
     Serial.printf("[LVGLRaceRunning] startRace called - Duration: %lu minutes\n", durationMinutes);
     Serial.printf("[LVGLRaceRunning] BeaconService: %p, LapCounter: %p\n", _beaconService, _lapCounter);
     
+    // Set race state FIRST (before enabling services)
     _raceStartTime = millis();
     _raceDuration = durationMinutes * 60 * 1000;  // Convert to milliseconds
     _isRunning = true;
     _isPaused = false;
     _pausedTime = 0;
     _lastUpdate = millis();
+    _lastDisplayedTime = 0;
+    _lastDisplayedRemaining = 0;
     
     // Enable race mode in beacon service
     if (_beaconService) {
@@ -199,6 +203,12 @@ void LVGLRaceRunningScreen::stopRace() {
     }
     
     Serial.println("[LVGLRaceRunning] Race stopped");
+    
+    // Navigate to results screen
+    if (_navigation && _raceResultsScreen) {
+        Serial.println("[LVGLRaceRunning] Navigating to results screen");
+        _navigation->setScreen((LVGLBaseScreen*)_raceResultsScreen);
+    }
 }
 
 void LVGLRaceRunningScreen::updateTimeDisplay() {
@@ -222,7 +232,7 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
     lv_obj_clean(_leaderboardList);
     
     if (!_lapCounter) {
-        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "LapCounter nicht verfügbar");
+        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "LapCounter not available");
         lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }
@@ -230,7 +240,7 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
     std::vector<TeamData*> leaderboard = _lapCounter->getLeaderboard();
     
     if (leaderboard.empty()) {
-        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "Keine Teams");
+        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "No teams");
         lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }
@@ -241,7 +251,7 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
         if (count >= 4) break; // Max 4 teams visible
         
         char info[128];
-        snprintf(info, sizeof(info), "%u. %s\nRunden: %u", 
+        snprintf(info, sizeof(info), "%u. %s\nLaps: %u", 
                 count + 1, team->teamName.c_str(), team->lapCount);
         
         lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, info);

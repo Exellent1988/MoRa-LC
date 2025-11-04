@@ -45,10 +45,11 @@ private:
     static void backBtnEventHandler(lv_event_t* e);
     static void addBtnEventHandler(lv_event_t* e);
     static void teamItemEventHandler(lv_event_t* e);
+    static void deleteTeamEventHandler(lv_event_t* e);
     
     // Helper methods
     void updateTeamList();
+    void showDeleteConfirmDialog(uint8_t teamId);
 };
 
 #endif // LVGL_TEAMS_SCREEN_H
-

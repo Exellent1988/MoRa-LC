@@ -5,12 +5,12 @@
 #include "../../services/lap_counter_service.h"
 #include <lvgl.h>
 
-// Forward declaration
+// Forward declarations
 class LVGLNavigation;
 
 /**
  * Team Edit Screen (LVGL8)
- * Add or edit team name
+ * Create or edit team name
  */
 class LVGLTeamEditScreen : public LVGLBaseScreen {
 public:
@@ -43,4 +43,3 @@ private:
 };
 
 #endif // LVGL_TEAM_EDIT_SCREEN_H
-

@@ -1,5 +1,7 @@
 #include "lap_counter_service.h"
+#include "persistence_service.h"
 #include <algorithm>
+#include <ArduinoJson.h>
 
 LapCounterService::LapCounterService()
     : _beaconService(nullptr)
@@ -72,6 +74,9 @@ bool LapCounterService::updateTeam(uint8_t teamId, const String& name) {
     
     it->second.teamName = name;
     Serial.printf("[LapCounter] Team updated: ID=%u, Name=%s\n", teamId, name.c_str());
+    
+    // Auto-save teams (optional)
+    
     return true;
 }
 
@@ -130,6 +135,89 @@ void LapCounterService::resetRace() {
     _teams.clear();
     _nextTeamId = 1;
     Serial.println("[LapCounter] Race reset");
+}
+
+bool LapCounterService::saveTeams(PersistenceService* persistence) {
+    if (!persistence || !persistence->isReady()) {
+        Serial.println("[LapCounter] ERROR: PersistenceService not available");
+        return false;
+    }
+    
+    // Create JSON document
+    StaticJsonDocument<4096> doc;
+    doc["nextTeamId"] = _nextTeamId;
+    
+    JsonArray teamsArray = doc.createNestedArray("teams");
+    for (const auto& pair : _teams) {
+        const TeamData& team = pair.second;
+        JsonObject teamObj = teamsArray.createNestedObject();
+        teamObj["id"] = team.teamId;
+        teamObj["name"] = team.teamName;
+        teamObj["beaconUUID"] = team.beaconUUID;
+        teamObj["isActive"] = team.isActive;
+    }
+    
+    // Serialize to string
+    String json;
+    serializeJson(doc, json);
+    
+    // Save to NVS
+    bool result = persistence->saveString("teams", json);
+    if (result) {
+        Serial.printf("[LapCounter] Saved %zu teams\n", _teams.size());
+    } else {
+        Serial.println("[LapCounter] ERROR: Failed to save teams");
+    }
+    
+    return result;
+}
+
+bool LapCounterService::loadTeams(PersistenceService* persistence) {
+    if (!persistence || !persistence->isReady()) {
+        Serial.println("[LapCounter] ERROR: PersistenceService not available");
+        return false;
+    }
+    
+    // Load from NVS
+    String json = persistence->loadString("teams", "");
+    if (json.length() == 0) {
+        Serial.println("[LapCounter] No saved teams found");
+        return false;
+    }
+    
+    // Parse JSON
+    StaticJsonDocument<4096> doc;
+    DeserializationError error = deserializeJson(doc, json);
+    if (error) {
+        Serial.printf("[LapCounter] ERROR: Failed to parse JSON: %s\n", error.c_str());
+        return false;
+    }
+    
+    // Clear existing teams
+    _teams.clear();
+    
+    // Load next team ID
+    _nextTeamId = doc["nextTeamId"] | 1;
+    
+    // Load teams
+    JsonArray teamsArray = doc["teams"];
+    for (JsonObject teamObj : teamsArray) {
+        TeamData team;
+        team.teamId = teamObj["id"] | 0;
+        team.teamName = teamObj["name"] | "";
+        team.beaconUUID = teamObj["beaconUUID"] | "";
+        team.isActive = teamObj["isActive"] | true;
+        team.lapCount = 0;
+        team.lastLapTime = 0;
+        team.bestLapTime = 0;
+        
+        if (team.teamId > 0 && team.teamName.length() > 0) {
+            _teams[team.teamId] = team;
+        }
+    }
+    
+    Serial.printf("[LapCounter] Loaded %zu teams\n", _teams.size());
+    return true;
 }
 
 void LapCounterService::update() {

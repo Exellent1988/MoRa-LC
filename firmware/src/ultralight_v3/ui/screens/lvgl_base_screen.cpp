@@ -26,6 +26,13 @@ lv_obj_t* LVGLBaseScreen::createHeader(const char* title, bool showBack, lv_even
     lv_obj_t* titleLabel = lv_label_create(header);
     lv_label_set_text(titleLabel, title);
     lv_obj_set_style_text_color(titleLabel, rgb565ToLVGL(Colors::HEADER_TEXT), 0);
+    
+    // Use larger font for header
+    #ifdef LV_FONT_MONTSERRAT_18
+    extern const lv_font_t lv_font_montserrat_18;
+    lv_obj_set_style_text_font(titleLabel, &lv_font_montserrat_18, 0);
+    #endif
+    
     lv_obj_align(titleLabel, LV_ALIGN_CENTER, 0, 0);
     
     // Back button (if needed)
@@ -67,6 +74,13 @@ lv_obj_t* LVGLBaseScreen::createButton(const char* label, int x, int y, int w, i
         lv_obj_t* btnLabel = lv_label_create(btn);
         lv_label_set_text(btnLabel, label);
         lv_obj_set_style_text_color(btnLabel, rgb565ToLVGL(Colors::BUTTON_TEXT), 0);
+        
+        // Use larger font for better readability
+        #ifdef LV_FONT_MONTSERRAT_16
+        extern const lv_font_t lv_font_montserrat_16;
+        lv_obj_set_style_text_font(btnLabel, &lv_font_montserrat_16, 0);
+        #endif
+        
         lv_obj_center(btnLabel);
     }
     

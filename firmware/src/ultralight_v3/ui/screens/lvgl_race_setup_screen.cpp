@@ -36,26 +36,24 @@ void LVGLRaceSetupScreen::onEnter() {
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
     // Create header with back button (no umlauts - LVGL default font doesn't support them)
-    createHeader("Rennen einrichten", true, backBtnEventHandler, this);
+    createHeader("Race Setup", true, backBtnEventHandler, this);
     
     // Duration controls
     int y = HEADER_HEIGHT + Spacing::MD;
-    _durationLabel = createLabel("Dauer:", Spacing::MD, y, 100, 30, rgb565ToLVGL(Colors::TEXT));
+    _durationLabel = createLabel("Duration:", Spacing::MD, y, 100, 30, rgb565ToLVGL(Colors::TEXT));
     if (!_durationLabel) {
         Serial.println("[LVGLRaceSetup] ERROR: Failed to create duration label");
         return;
     }
     y += 35;
     
-    // Duration value (larger text)
-    _durationValue = createLabel("60 Min", Spacing::MD, y, 150, 40, rgb565ToLVGL(Colors::TEXT));
+    // Duration value (larger text) - center it
+    _durationValue = createLabel("60 Min", 0, y, SCREEN_WIDTH, 40, rgb565ToLVGL(Colors::TEXT));
     if (!_durationValue) {
         Serial.println("[LVGLRaceSetup] ERROR: Failed to create duration value label");
         return;
     }
-    
-    // Increase text size by using style (if available)
-    // Note: Fonts must be enabled in lv_conf.h
+    lv_obj_set_style_text_align(_durationValue, LV_TEXT_ALIGN_CENTER, 0);
     
     // Duration buttons
     int btnW = 60;
@@ -158,13 +156,15 @@ void LVGLRaceSetupScreen::startBtnEventHandler(lv_event_t* e) {
     Serial.printf("[LVGLRaceSetup] Navigation: %p, RaceRunningScreen: %p\n", 
                   screen->_navigation, screen->_raceRunningScreen);
     
-    // Start race first
+    // Start race first (but don't call onEnter yet - navigation will do that)
+    // Just set the race parameters
     screen->_raceRunningScreen->startRace(screen->_raceDuration);
     
-    // Small delay to ensure race is started
+    // Small delay to ensure race state is set
     delay(10);
     
     // Navigate to race running screen
+    // This will call onEnter() which will create the UI
     Serial.println("[LVGLRaceSetup] Navigating to race running screen...");
     screen->_navigation->setScreen(screen->_raceRunningScreen);
     Serial.println("[LVGLRaceSetup] Navigation completed");

@@ -8,6 +8,9 @@
 #include <vector>
 #include <map>
 
+// Forward declaration
+class PersistenceService;
+
 /**
  * Lap Counter Service
  * Handles lap counting logic, team management, and race state
@@ -39,6 +42,10 @@ public:
     // Initialization
     bool begin(BeaconService* beaconService);
     void end();
+    
+    // Persistence
+    bool saveTeams(PersistenceService* persistence);
+    bool loadTeams(PersistenceService* persistence);
     
     // Team management
     bool addTeam(const String& name);

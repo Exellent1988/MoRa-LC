@@ -38,6 +38,9 @@ public:
     bool remove(const char* key);
     void clearAll();
     
+    // Status
+    bool isReady() const { return _initialized; }
+    
 private:
     Preferences _prefs;
     bool _initialized;

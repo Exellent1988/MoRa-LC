@@ -29,8 +29,8 @@ void LVGLRaceResultsScreen::onEnter() {
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header with back button
-    createHeader("Ergebnisse", true, backBtnEventHandler, this);
+    // Create header with back button (ASCII only)
+    createHeader("Results", true, backBtnEventHandler, this);
     
     // Create list for results
     int listY = HEADER_HEIGHT + Spacing::SM;
@@ -54,7 +54,7 @@ void LVGLRaceResultsScreen::updateResultsList() {
     lv_obj_clean(_list);
     
     if (!_lapCounter) {
-        lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "LapCounter nicht verfügbar");
+        lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "LapCounter not available");
         lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }
@@ -62,12 +62,12 @@ void LVGLRaceResultsScreen::updateResultsList() {
     std::vector<TeamData*> leaderboard = _lapCounter->getLeaderboard();
     
     if (leaderboard.empty()) {
-        lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "Keine Ergebnisse");
+        lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "No results");
         lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }
     
-    // Show results sorted by lap count
+    // Show results sorted by lap count (ASCII only)
     int rank = 1;
     for (TeamData* team : leaderboard) {
         char info[128];
@@ -75,10 +75,10 @@ void LVGLRaceResultsScreen::updateResultsList() {
             uint32_t seconds = team->bestLapTime / 1000;
             uint32_t minutes = seconds / 60;
             seconds %= 60;
-            snprintf(info, sizeof(info), "%u. %s\nRunden: %u | Beste Zeit: %lu:%02lu", 
+            snprintf(info, sizeof(info), "%u. %s\nLaps: %u | Best: %lu:%02lu", 
                     rank, team->teamName.c_str(), team->lapCount, minutes, seconds);
         } else {
-            snprintf(info, sizeof(info), "%u. %s\nRunden: %u", 
+            snprintf(info, sizeof(info), "%u. %s\nLaps: %u", 
                     rank, team->teamName.c_str(), team->lapCount);
         }
         

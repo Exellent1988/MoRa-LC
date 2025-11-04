@@ -40,7 +40,7 @@ void LVGLHomeScreen::onEnter() {
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header
+    // Create header (no umlauts - use ASCII only)
     createHeader("MoRa-LC", false);
     
     // Calculate button positions (centered, vertical layout)
@@ -50,8 +50,8 @@ void LVGLHomeScreen::onEnter() {
     int btnSpacing = Spacing::SM;
     int x = Spacing::MD;
     
-    // Race button with icon
-    _btnRace = createButton("Neues Rennen", x, startY, btnW, btnH, btnRaceEventHandler, this);
+    // Race button with icon (no umlauts - ASCII only)
+    _btnRace = createButton("New Race", x, startY, btnW, btnH, btnRaceEventHandler, this);
     lv_obj_set_style_bg_color(_btnRace, rgb565ToLVGL(Colors::SECONDARY), 0);
     createIconImage(_btnRace, ICON_RACE, 24);
     startY += btnH + btnSpacing;
@@ -61,13 +61,13 @@ void LVGLHomeScreen::onEnter() {
     createIconImage(_btnTeams, ICON_TEAM, 24);
     startY += btnH + btnSpacing;
     
-    // Results button with icon
-    _btnResults = createButton("Ergebnisse", x, startY, btnW, btnH, btnResultsEventHandler, this);
+    // Results button with icon (no umlauts)
+    _btnResults = createButton("Results", x, startY, btnW, btnH, btnResultsEventHandler, this);
     createIconImage(_btnResults, ICON_RESULTS, 24);
     startY += btnH + btnSpacing;
     
-    // Settings button with icon
-    _btnSettings = createButton("Einstellungen", x, startY, btnW, btnH, btnSettingsEventHandler, this);
+    // Settings button with icon (no umlauts)
+    _btnSettings = createButton("Settings", x, startY, btnW, btnH, btnSettingsEventHandler, this);
     createIconImage(_btnSettings, ICON_SETTINGS, 24);
     
     Serial.println("[LVGLHomeScreen] Home screen created");

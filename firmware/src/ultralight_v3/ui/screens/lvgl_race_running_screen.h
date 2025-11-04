@@ -6,8 +6,9 @@
 #include "../../services/lap_counter_service.h"
 #include <lvgl.h>
 
-// Forward declaration
+// Forward declarations
 class LVGLNavigation;
+class LVGLRaceResultsScreen;
 
 /**
  * Race Running Screen (LVGL8)
@@ -26,6 +27,9 @@ public:
     // Set navigation for back button
     void setNavigation(LVGLNavigation* nav) { _navigation = nav; }
     
+    // Set race results screen for navigation
+    void setRaceResultsScreen(LVGLRaceResultsScreen* screen) { _raceResultsScreen = screen; }
+    
     // Race control
     void startRace(uint32_t durationMinutes);
     void pauseRace();
@@ -35,6 +39,7 @@ private:
     LVGLNavigation* _navigation;
     BeaconService* _beaconService;
     LapCounterService* _lapCounter;
+    LVGLRaceResultsScreen* _raceResultsScreen;
     
     // UI elements
     lv_obj_t* _timeLabel;

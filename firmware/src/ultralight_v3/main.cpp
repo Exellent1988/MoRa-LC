@@ -64,7 +64,7 @@ LVGLTeamsScreen lvglTeamsScreen(&lvglDisplay, &lapCounterService);
 LVGLRaceSetupScreen lvglRaceSetupScreen(&lvglDisplay);
 LVGLRaceRunningScreen lvglRaceRunningScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLRaceResultsScreen lvglRaceResultsScreen(&lvglDisplay, &lapCounterService);
-LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay);
+LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService);
 LVGLBeaconAssignScreen lvglBeaconAssignScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLTeamEditScreen lvglTeamEditScreen(&lvglDisplay, &lapCounterService);
 #endif
@@ -171,6 +171,7 @@ void setup() {
     lvglRaceSetupScreen.setNavigation(&lvglNavigation);
     lvglRaceSetupScreen.setRaceRunningScreen(&lvglRaceRunningScreen);
     lvglRaceRunningScreen.setNavigation(&lvglNavigation);
+    lvglRaceRunningScreen.setRaceResultsScreen(&lvglRaceResultsScreen);
     lvglRaceResultsScreen.setNavigation(&lvglNavigation);
     lvglSettingsScreen.setNavigation(&lvglNavigation);
     
@@ -202,10 +203,12 @@ void setup() {
             // Initialize services
             if (lapCounterService.begin(&beaconService)) {
                 Serial.println("[Main] LapCounterService initialized");
-            }
-            
-            if (persistenceService.begin()) {
-                Serial.println("[Main] PersistenceService initialized");
+                
+                // Load teams from persistence
+                if (persistenceService.begin()) {
+                    Serial.println("[Main] PersistenceService initialized");
+                    lapCounterService.loadTeams(&persistenceService);
+                }
             }
             
             if (dataLoggerService.begin(&sdCard)) {
