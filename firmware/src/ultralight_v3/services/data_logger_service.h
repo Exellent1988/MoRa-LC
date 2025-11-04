@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "../core/config.h"
 #include "../hardware/sd_card.h"
-#include <SdFat.h>
+#include <SD.h>
 #include <queue>
 #include <string>
 
@@ -57,7 +57,7 @@ private:
     SDCard* _sdCard;
     bool _initialized;
     std::queue<LogEntry> _logQueue;
-    FsFile _raceFile;  // SdFat File type
+    File _raceFile;  // Arduino SD File type
     String _currentRaceName;
     uint32_t _lastFlush;
     

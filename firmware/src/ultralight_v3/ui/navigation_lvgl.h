@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "screens/lvgl_base_screen.h"
 #include <lvgl.h>
+#include <vector>
 
 /**
  * Navigation System for LVGL8 Screens
@@ -29,8 +30,9 @@ private:
     LVGLDisplay* _lvglDisplay;
     LVGLBaseScreen* _currentScreen;
     LVGLBaseScreen* _previousScreen;
+    std::vector<LVGLBaseScreen*> _navigationStack;  // Simple navigation stack
     
-    void transitionToScreen(LVGLBaseScreen* newScreen);
+    void transitionToScreen(LVGLBaseScreen* newScreen, bool isBackNavigation = false);
 };
 
 #endif // NAVIGATION_LVGL_H

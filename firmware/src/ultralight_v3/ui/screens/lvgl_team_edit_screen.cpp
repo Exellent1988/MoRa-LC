@@ -8,6 +8,7 @@ LVGLTeamEditScreen::LVGLTeamEditScreen(LVGLDisplay* lvglDisplay, LapCounterServi
     , _lapCounter(lapCounter)
     , _teamId(0)
     , _nameTextArea(nullptr)
+    , _keyboard(nullptr)
     , _saveButton(nullptr)
     , _cancelButton(nullptr) {
 }
@@ -51,6 +52,8 @@ void LVGLTeamEditScreen::onEnter() {
     lv_textarea_set_placeholder_text(_nameTextArea, "Enter team name");
     lv_obj_set_style_bg_color(_nameTextArea, rgb565ToLVGL(Colors::SURFACE), 0);
     lv_obj_set_style_text_color(_nameTextArea, rgb565ToLVGL(Colors::TEXT), 0);
+    lv_obj_set_style_border_width(_nameTextArea, 1, 0);
+    lv_obj_set_style_border_color(_nameTextArea, rgb565ToLVGL(Colors::BORDER), 0);
     
     // If editing existing team, load name
     if (_teamId > 0 && _lapCounter) {
@@ -61,6 +64,17 @@ void LVGLTeamEditScreen::onEnter() {
     }
     
     y += 60;
+    
+    // Create keyboard for text input
+    _keyboard = lv_keyboard_create(_screen);
+    lv_keyboard_set_textarea(_keyboard, _nameTextArea);
+    lv_keyboard_set_mode(_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
+    lv_obj_set_size(_keyboard, SCREEN_WIDTH, SCREEN_HEIGHT - y - BUTTON_HEIGHT - Spacing::MD);
+    lv_obj_set_pos(_keyboard, 0, y);
+    lv_obj_set_style_bg_color(_keyboard, rgb565ToLVGL(Colors::BACKGROUND), 0);
+    
+    // Adjust button positions to be above keyboard
+    y = SCREEN_HEIGHT - BUTTON_HEIGHT - Spacing::MD;
     
     // Buttons
     int btnW = (SCREEN_WIDTH - 3 * Spacing::MD) / 2;
@@ -75,14 +89,23 @@ void LVGLTeamEditScreen::onEnter() {
 }
 
 void LVGLTeamEditScreen::onExit() {
-    // Cleanup if needed
+    // Hide keyboard when leaving screen
+    if (_keyboard) {
+        lv_obj_add_flag(_keyboard, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void LVGLTeamEditScreen::backBtnEventHandler(lv_event_t* e) {
     LVGLTeamEditScreen* screen = (LVGLTeamEditScreen*)lv_event_get_user_data(e);
-    if (screen && screen->_navigation) {
-        Serial.println("[LVGLTeamEdit] Back button clicked");
-        screen->_navigation->goBack();
+    if (screen) {
+        // Hide keyboard before navigating back
+        if (screen->_keyboard) {
+            lv_obj_add_flag(screen->_keyboard, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (screen->_navigation) {
+            Serial.println("[LVGLTeamEdit] Back button clicked");
+            screen->_navigation->goBack();
+        }
     }
 }
 
@@ -126,8 +149,14 @@ void LVGLTeamEditScreen::saveBtnEventHandler(lv_event_t* e) {
 
 void LVGLTeamEditScreen::cancelBtnEventHandler(lv_event_t* e) {
     LVGLTeamEditScreen* screen = (LVGLTeamEditScreen*)lv_event_get_user_data(e);
-    if (screen && screen->_navigation) {
-        Serial.println("[LVGLTeamEdit] Cancel button clicked");
-        screen->_navigation->goBack();
+    if (screen) {
+        // Hide keyboard before navigating back
+        if (screen->_keyboard) {
+            lv_obj_add_flag(screen->_keyboard, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (screen->_navigation) {
+            Serial.println("[LVGLTeamEdit] Cancel button clicked");
+            screen->_navigation->goBack();
+        }
     }
 }

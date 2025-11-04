@@ -1,15 +1,19 @@
 #include "lvgl_settings_screen.h"
 #include "../navigation_lvgl.h"
+#include "../widgets/lvgl_dialog.h"
 #include "../../services/persistence_service.h"
 #include "../../services/data_logger_service.h"
+#include "../../services/lap_counter_service.h"
 #include <Arduino.h>
 
-LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger)
+LVGLSettingsScreen::LVGLSettingsScreen(LVGLDisplay* lvglDisplay, PersistenceService* persistence, DataLoggerService* dataLogger, LapCounterService* lapCounter)
     : LVGLBaseScreen(lvglDisplay)
     , _navigation(nullptr)
     , _persistence(persistence)
     , _dataLogger(dataLogger)
-    , _list(nullptr) {
+    , _lapCounter(lapCounter)
+    , _list(nullptr)
+    , _dialog(nullptr) {
 }
 
 LVGLSettingsScreen::~LVGLSettingsScreen() {
@@ -31,6 +35,11 @@ void LVGLSettingsScreen::onEnter() {
     
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
+    
+    // Create dialog instance (will be created on demand)
+    if (!_dialog) {
+        _dialog = new LVGLDialog(_screen);
+    }
     
     // Create header with back button (ASCII only - no umlauts)
     createHeader("Settings", true, backBtnEventHandler, this);
@@ -90,30 +99,85 @@ void LVGLSettingsScreen::settingsItemEventHandler(lv_event_t* e) {
 
 void LVGLSettingsScreen::handleBLESettings() {
     Serial.println("[LVGLSettings] BLE Settings clicked");
-    // TODO: Open BLE settings dialog/screen
-    // For now, just show message
+    
+    // Show BLE settings info in a dialog
+    char message[256];
+    snprintf(message, sizeof(message), 
+             "Scan Interval: %d ms\n"
+             "Scan Window: %d ms\n"
+             "RSSI Threshold: %d dBm\n"
+             "UUID Filter: %s\n"
+             "Beacon Timeout: %d ms\n\n"
+             "Settings are configured at compile time.",
+             BLE_SCAN_INTERVAL, BLE_SCAN_WINDOW, BLE_RSSI_THRESHOLD,
+             BLE_UUID_PREFIX, BEACON_TIMEOUT);
+    
+    if (_dialog) {
+        _dialog->show("BLE Settings", message, "OK", nullptr, nullptr, nullptr, nullptr);
+    }
 }
 
 void LVGLSettingsScreen::handleSaveData() {
     Serial.println("[LVGLSettings] Save Data clicked");
-    // Note: Teams need to be saved via LapCounterService
-    // This is just a placeholder - actual save would need LapCounterService reference
-    if (_persistence) {
-        Serial.println("[LVGLSettings] Data save triggered");
-        // TODO: Get LapCounterService reference and call saveTeams()
-    } else {
+    
+    if (!_persistence) {
         Serial.println("[LVGLSettings] ERROR: PersistenceService not available");
+        if (_dialog) {
+            _dialog->show("Error", "PersistenceService not available", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
+        return;
+    }
+    
+    if (!_lapCounter) {
+        Serial.println("[LVGLSettings] ERROR: LapCounterService not available");
+        if (_dialog) {
+            _dialog->show("Error", "LapCounterService not available", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
+        return;
+    }
+    
+    // Save teams to persistent storage
+    if (_lapCounter->saveTeams(_persistence)) {
+        Serial.println("[LVGLSettings] Teams saved successfully");
+        if (_dialog) {
+            _dialog->show("Success", "Teams saved successfully", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
+    } else {
+        Serial.println("[LVGLSettings] ERROR: Failed to save teams");
+        if (_dialog) {
+            _dialog->show("Error", "Failed to save teams", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
     }
 }
 
 void LVGLSettingsScreen::handleReset() {
     Serial.println("[LVGLSettings] Reset clicked");
-    // TODO: Show confirmation dialog
-    if (_persistence) {
-        _persistence->clearAll();
-        Serial.println("[LVGLSettings] All data cleared");
-    } else {
+    
+    if (!_persistence) {
         Serial.println("[LVGLSettings] ERROR: PersistenceService not available");
+        if (_dialog) {
+            _dialog->show("Error", "PersistenceService not available", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
+        return;
+    }
+    
+    // Show confirmation dialog
+    if (_dialog) {
+        _dialog->showConfirm("Reset", 
+                             "Are you sure you want to delete all data? This cannot be undone.",
+                             "Yes", "Cancel",
+                             resetConfirmHandler, nullptr, this);
+    }
+}
+
+void LVGLSettingsScreen::resetConfirmHandler(lv_event_t* e) {
+    LVGLSettingsScreen* screen = (LVGLSettingsScreen*)lv_event_get_user_data(e);
+    if (screen && screen->_persistence) {
+        screen->_persistence->clearAll();
+        Serial.println("[LVGLSettings] All data cleared");
+        if (screen->_dialog) {
+            screen->_dialog->show("Success", "All data cleared", "OK", nullptr, nullptr, nullptr, nullptr);
+        }
     }
 }
 

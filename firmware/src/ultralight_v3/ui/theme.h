@@ -32,8 +32,8 @@ namespace Colors {
     constexpr uint16_t BUTTON = 0x8410;        // Medium Gray
     constexpr uint16_t BUTTON_TEXT = 0x0000;   // Black
     constexpr uint16_t BUTTON_PRESSED = 0x630C; // Darker Gray
-    constexpr uint16_t HEADER_BG = 0x001F;     // Dark Blue
-    constexpr uint16_t HEADER_TEXT = 0xFFFF;   // White
+    constexpr uint16_t HEADER_BG = 0x07E0;     // Green (Secondary color)
+    constexpr uint16_t HEADER_TEXT = 0xFFFF;   // White (for better contrast on green)
     
     // List Colors
     constexpr uint16_t LIST_ITEM = 0x8410;     // Medium Gray

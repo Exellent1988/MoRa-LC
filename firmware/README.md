@@ -4,28 +4,45 @@ ESP32 Firmware für alle Hardware-Komponenten des MoRa-LC Systems.
 
 ## Struktur
 
-### Shared Libraries (`/lib/`)
-Gemeinsame Module für beide Varianten:
-- **BLEScanner** - BLE iBeacon Scanning und Erkennung
-- **LapCounter** - Rundenzählung Algorithmus
-- **DataLogger** - SD-Karte Logging (CSV)
-- **LoRaComm** - LoRa Kommunikation (nur FullBlown)
-- **IMUHandler** - IMU MPU6050 Integration (nur FullBlown)
-- **PositionTracker** - Position Tracking (nur FullBlown)
+### Source Code (`/src/`)
 
-### Firmware-Projekte
+#### UltraLight v3 (`/src/ultralight_v3/`) - **Production-Ready** ✅
+Complete Rewrite mit Clean Architecture.
 
-#### UltraLight (`/ultralight/`)
-CheapYellow Display Firmware für standalone Betrieb.
+**Hardware:** ESP32-2432S028 (CheapYellow Display)
 
-**Hardware:** ESP32-2432S028 (CheapYellow)
+**Architektur:**
+```
+ultralight_v3/
+├── core/           # System, Config, Memory, Tasks
+├── hardware/       # Display, Touch, SD Card, BLE
+├── services/       # Beacon, LapCounter, Persistence, DataLogger
+└── ui/             # LVGL8 Screens, Navigation, Widgets
+```
 
 **Features:**
-- TFT Touch Display (320x240)
-- BLE Scanner für Beacon-Erkennung
-- Team-Management UI
-- Rundenzählung & Zeiten
-- SD-Karte Logging
+- LVGL8 UI System (modern, responsive)
+- NimBLE BLE Scanning (optimiert für Race Mode)
+- Service-basierte Architektur
+- SD Card CSV Logging
+- Team Management mit Persistence (NVS)
+- Automatische Rundenzählung
+- Live Leaderboard
+
+**BLE Backend Optionen:**
+- NimBLE-Arduino (Standard, beste Performance)
+- ESP32 BLE Arduino (Alternative)
+- ESP-IDF Native (Optional, experimentell)
+
+#### UltraLight v1 & v2 (Legacy - Deprecated)
+Alte Versionen mit TFT_eSPI/LovyanGFX. Nicht mehr in Entwicklung.
+
+### Shared Libraries (`/lib/`)
+Legacy Libraries für alte Versionen:
+- **BLEScanner** - BLE iBeacon Scanning
+- **LapCounter** - Rundenzählung Algorithmus
+- **DataLogger** - SD-Karte Logging
+- **LoRaComm** - LoRa Kommunikation (FullBlown)
 
 #### FullBlown System
 
@@ -77,45 +94,57 @@ LED Display für Ampel & Countdown.
 ### PlatformIO Setup
 
 ```bash
-# VS Code Extension installieren oder:
+# Install PlatformIO
 pip install platformio
 
-# Build für spezifisches Environment:
-cd beacon
-pio run
+# Build UltraLight v3:
+cd firmware
+pio run -e ultralight_v3
 
 # Upload:
-pio run -t upload
+pio run -e ultralight_v3 -t upload
 
 # Serial Monitor:
 pio device monitor
 ```
 
-### Multi-Environment Config
+### Environments
 
-Jedes Projekt hat eigene `platformio.ini` mit shared lib dependencies.
+Verfügbare PlatformIO Environments in `platformio.ini`:
 
-Beispiel:
-```ini
-[env:esp32dev]
-platform = espressif32
-board = esp32dev
-framework = arduino
-lib_deps = 
-    SPI
-    Wire
-    ../lib/BLEScanner
-    ../lib/LapCounter
-```
+- `ultralight_v3` - **Production-Ready** UltraLight v3 (Clean Architecture)
+- `ultralight_v2` - Legacy UltraLight v2 (LovyanGFX)
+- `ultralight` - Legacy UltraLight v1 (TFT_eSPI)
 
-### Configuration
+### Configuration (UltraLight v3)
 
-Beacon-ID und andere Settings in `src/config.h`:
+Alle Settings in `src/ultralight_v3/core/config.h`:
 
 ```cpp
-#define BEACON_ID 1        // Eindeutige ID (1-99)
-#define LORA_FREQ 868E6    // 868MHz (EU)
-#define BEACON_INTERVAL 1000  // ms
+// Display
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
+
+// BLE Scanner
+#define BLE_SCAN_INTERVAL 100
+#define BLE_SCAN_WINDOW   99
+#define BLE_RSSI_THRESHOLD -100
+#define BLE_UUID_PREFIX "c3:00:"
+
+// Lap Detection
+#define DEFAULT_LAP_RSSI_NEAR -65
+#define DEFAULT_LAP_RSSI_FAR  -80
+```
+
+### BLE Backend Selection
+
+In `config.h` BLE Backend wählen:
+
+```cpp
+// Uncomment ONE of these (or none for NimBLE - default):
+// #define BLE_USE_ESP32       // ESP32 BLE Arduino
+// #define BLE_USE_ESP_IDF     // ESP-IDF Native
+// Default: NimBLE-Arduino (best performance)
 ```
 
 ## Testing
@@ -152,13 +181,53 @@ pio test
 
 ## Libraries
 
-Verwendete externe Libraries:
-- **RadioHead** - LoRa Kommunikation
-- **FastLED** - WS2812 LED Steuerung
-- **TFT_eSPI** - Display (UltraLight)
-- **ArduinoJson** - JSON Parsing
-- **PubSubClient** - MQTT Client
-- **ESP32 BLE Arduino** - BLE Funktionen
+### UltraLight v3 Dependencies:
+- **LovyanGFX** (^1.2.7) - Display Treiber
+- **LVGL** (^8.4.0) - UI Framework
+- **NimBLE-Arduino** (^1.4.0) - BLE Scanning (Standard)
+- **ArduinoJson** (^7.0.0) - JSON Parsing
+- **SdFat** (^2.2.2) - SD Card mit besserer Performance
+- **SPI, SD** - Arduino Standard Libraries
+
+### Legacy Dependencies:
+- **TFT_eSPI** - Display (v1)
+- **RadioHead** - LoRa (FullBlown)
+- **FastLED** - WS2812 LED (FullBlown)
+- **PubSubClient** - MQTT (FullBlown)
+
+## Architecture (UltraLight v3)
+
+### Clean Architecture Layers:
+
+1. **Core** - System Management
+   - SystemManager: Watchdog, Initialization
+   - TaskManager: Task Scheduling
+   - MemoryManager: Heap Monitoring
+
+2. **Hardware** - Abstraction Layer
+   - Display: LovyanGFX Wrapper
+   - Touch: XPT2046 Handler
+   - SD Card: File Operations
+   - BLE: Multiple Backend Support
+
+3. **Services** - Business Logic
+   - BeaconService: BLE Scanning & Filtering
+   - LapCounterService: Race Logic
+   - PersistenceService: NVS Storage
+   - DataLoggerService: CSV Logging
+
+4. **UI** - User Interface
+   - LVGL8 Screens
+   - Navigation System
+   - Widgets & Themes
+
+### Service Communication:
+
+```
+UI (Screens) → Services → Hardware
+     ↓            ↓          ↓
+  Navigation   Logic      I/O
+```
 
 
 
