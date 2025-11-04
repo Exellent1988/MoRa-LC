@@ -9,7 +9,6 @@ class LVGLNavigation;
 class PersistenceService;
 class DataLoggerService;
 class LapCounterService;
-class LVGLDialog;
 
 /**
  * Settings Screen (LVGL8)
@@ -33,7 +32,6 @@ private:
     DataLoggerService* _dataLogger;
     LapCounterService* _lapCounter;
     lv_obj_t* _list;
-    LVGLDialog* _dialog;
     
     // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
