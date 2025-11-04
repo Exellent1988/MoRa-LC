@@ -99,9 +99,8 @@ lv_obj_t* LVGLBaseScreen::createLabel(const char* text, int x, int y, int w, int
     lv_obj_set_style_text_color(label, color, 0);
     lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
     
-    // Use larger font for better readability (if available)
-    // Note: Fonts must be enabled in lv_conf.h
-    // For now, use default font which should be readable
+    // Use default font (montserrat_14) which is readable and consistent
+    // Font is set in lv_conf.h as LV_FONT_DEFAULT
     
     return label;
 }

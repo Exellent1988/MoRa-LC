@@ -62,6 +62,11 @@ void LVGLRaceRunningScreen::onEnter() {
     _timeLabel = createLabel("00:00:00", 0, timeY, SCREEN_WIDTH, 50, rgb565ToLVGL(Colors::TEXT));
     if (_timeLabel) {
         lv_obj_set_style_text_align(_timeLabel, LV_TEXT_ALIGN_CENTER, 0);
+        // Use larger font for time display
+        #ifdef LV_FONT_MONTSERRAT_24
+        extern const lv_font_t lv_font_montserrat_24;
+        lv_obj_set_style_text_font(_timeLabel, &lv_font_montserrat_24, 0);
+        #endif
     }
     
     // Remaining time (ASCII only)
