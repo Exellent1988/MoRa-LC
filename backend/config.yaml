@@ -1,0 +1,21 @@
+general:
+  app_name: "MoRa-LC Backend"
+  debug: false
+
+mqtt:
+  broker: localhost
+  port: 1883
+  # username: user
+  # password: pass
+  keepalive: 30
+  client_id: mora-backend
+  topics:
+    lora_rx: "mora/lora/rx"
+    lora_tx: "mora/lora/tx"
+
+database:
+  url: "sqlite:///./data/mora.db"
+
+track:
+  size_x: 75
+  size_y: 75

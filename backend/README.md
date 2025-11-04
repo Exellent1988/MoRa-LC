@@ -1,70 +1,89 @@
 # Backend
 
-Python Backend für das FullBlown MoRa-LC System.
+Python Backend fuer das FullBlown MoRa-LC System.
 
-## Stack
+## Aktueller Stand (November 2025)
 
-- **FastAPI** - REST API + WebSocket
-- **SQLAlchemy** - ORM
-- **SQLite** - Datenbank
-- **Paho-MQTT** - Hardware-Kommunikation
-- **NumPy/SciPy** - RSSI-Triangulation
-- **Pandas** - Datenauswertung
+- [x] FastAPI Grundgeruest mit automatischer Tabellenerstellung
+- [x] SQLAlchemy-Modelle fuer `Team`, `Race` und `RaceTeam`
+- [x] REST-Endpoints fuer Team- und Rennverwaltung (inkl. Statuswechsel)
+- [x] Konfiguration via `.env` oder `config.yaml`
+- [x] Health-Check Endpoint (`/health`)
+- [x] MQTT-Client + LoRa Handler (Basisimplementation)
+- [ ] Weiterfuehrende Services (Lap Counter, Position Tracker, Crash Detection)
 
 ## Setup
 
 ```bash
-# Virtual Environment
+# Virtual Environment (Pfad an bestehendes venv anpassen)
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Dependencies installieren
 pip install -r requirements.txt
 
-# Development Server starten
-python -m app.main
+# Datenbankordner vorbereiten (optional)
+mkdir -p data
+
+# Server starten
+uvicorn app.main:app --reload --log-level info
 ```
 
-Server läuft auf `http://localhost:8000`
+Server laeuft auf `http://localhost:8000`
 
-API Docs: `http://localhost:8000/docs`
+- API Docs: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 
-## Struktur
+### Tests
 
-```
-/app/
-  main.py                 # FastAPI App Entry
-  /api/
-    teams.py              # Team-Management Endpoints
-    races.py              # Rennen-Steuerung
-    telemetry.py          # Live-Daten WebSocket
-    admin.py              # Admin-Funktionen
-    track.py              # Strecken-Setup
-  /services/
-    lora_handler.py       # LoRa Message Processing
-    position_tracker.py   # Position aus RSSI + Checkpoints
-    ble_triangulation.py  # RSSI → Position
-    lap_counter.py        # Rundenzählung
-    crash_detector.py     # Sturz-Detection
-    penalty_system.py     # Strafen-System
-    data_logger.py        # SD-Karte Logging
-    display_controller.py # Display-Steuerung
-  /models/
-    database.py           # SQLAlchemy Models
-    schemas.py            # Pydantic Schemas
-  /utils/
-    mqtt_client.py        # MQTT Setup
-    track_geometry.py     # Geometrie-Berechnungen
+```bash
+pytest backend/tests
 ```
 
-## Configuration
+## Projektstruktur
 
-`config.yaml`:
+```
+/backend
+  config.yaml            # Default-Konfiguration
+  requirements.txt       # Python Dependencies
+  /app
+    __init__.py
+    main.py              # FastAPI App Factory
+    /api
+      __init__.py        # Router Aggregation
+      teams.py           # Team-Endpunkte
+      races.py           # Renn-Endpunkte
+    /core
+      config.py          # Settings + YAML Loader
+    /db
+      base.py            # SQLAlchemy Base
+      session.py         # Engine + Session Handling
+    /models
+      __init__.py
+      team.py            # Team-Modelle
+      race.py            # Race + RaceTeam Modelle
+    /schemas
+      __init__.py
+      team.py            # Pydantic Team Schemas
+      race.py            # Pydantic Race Schemas
+```
+
+## Konfiguration
+
+`config.yaml` kann pro Deployment angepasst werden und ueberschreibt Defaults aus den Environment-Variablen:
 
 ```yaml
+general:
+  app_name: "MoRa-LC Backend"
+  debug: false
+
 mqtt:
   broker: localhost
   port: 1883
+  # username: user
+  # password: pass
+  keepalive: 30
+  client_id: mora-backend
   topics:
     lora_rx: "mora/lora/rx"
     lora_tx: "mora/lora/tx"
@@ -72,142 +91,52 @@ mqtt:
 database:
   url: "sqlite:///./data/mora.db"
 
-lora:
-  frequency: 868
-  spreading_factor: 7
-
 track:
   size_x: 75
   size_y: 75
 ```
 
-## API Endpoints
+## MQTT und LoRa Handler
 
-### Teams
+- Beim Serverstart verbindet sich ein paho-mqtt Client mit dem Broker (`mqtt.broker`, `mqtt.port`).
+- Der LoRa-Handler abonniert `mqtt.topics.lora_rx`, dekodiert JSON-Payloads und bietet Listener-Hooks.
+- Falls keine Verbindung zustande kommt, protokolliert der Server den Fehler, laeuft aber weiter (REST API bleibt erreichbar).
+- Outbound-Kommandos koennen spaeter ueber `mqtt.topics.lora_tx` mit `MQTTClient.publish` verschickt werden.
 
-```
-GET    /api/teams              # Liste aller Teams
-POST   /api/teams              # Neues Team erstellen
-GET    /api/teams/{id}         # Team Details
-PUT    /api/teams/{id}         # Team aktualisieren
-DELETE /api/teams/{id}         # Team löschen
-POST   /api/teams/{id}/beacon  # Beacon zuordnen
-```
+## REST API
 
-### Races
+### Teams (`/api/teams`)
 
-```
-GET    /api/races              # Liste aller Rennen
-POST   /api/races              # Neues Rennen erstellen
-GET    /api/races/{id}         # Rennen Details
-PUT    /api/races/{id}/start   # Rennen starten
-PUT    /api/races/{id}/pause   # Rennen pausieren
-PUT    /api/races/{id}/stop    # Rennen beenden
-```
+- `GET /` ? Liste aller Teams
+- `POST /` ? Neues Team anlegen
+- `GET /{id}` ? Team-Details
+- `PUT /{id}` ? Team aktualisieren
+- `DELETE /{id}` ? Team loeschen
+- `POST /{id}/beacon` ? Beacon-MAC zuordnen
+- `GET /summaries` ? Kompakte Teamliste (ID + Name)
 
-### Telemetry (WebSocket)
+### Races (`/api/races`)
 
-```
-WS     /api/telemetry/live     # Live-Daten Stream
-```
+- `GET /` ? Alle Rennen
+- `POST /` ? Neues Rennen (inkl. optionaler Team-ID-Liste)
+- `GET /{id}` ? Renn-Details
+- `PUT /{id}` ? Allgemeine Updates (Name, Dauer, Status)
+- `PUT /{id}/start` ? Rennen starten/fortsetzen
+- `PUT /{id}/pause` ? Rennen pausieren
+- `PUT /{id}/stop` ? Rennen beenden
 
-### Admin
+Alle Rennen liefern verknuepfte Teams als `TeamSummary` zurueck.
 
-```
-GET    /api/admin/beacons      # Beacon-Status
-GET    /api/admin/gateways     # Gateway-Status
-POST   /api/admin/display      # Display-Kommando senden
-```
+## Naechste Schritte
 
-## Development
-
-### Database Migrations
-
-```bash
-# Neue Migration erstellen
-alembic revision --autogenerate -m "Add teams table"
-
-# Migration anwenden
-alembic upgrade head
-
-# Rollback
-alembic downgrade -1
-```
-
-### Testing
-
-```bash
-# Unit Tests
-pytest
-
-# Mit Coverage
-pytest --cov=app tests/
-
-# Spezifischer Test
-pytest tests/test_lap_counter.py -v
-```
-
-### Debug Mode
-
-```bash
-# Mit Auto-Reload
-uvicorn app.main:app --reload --log-level debug
-```
-
-## MQTT Topics
-
-**Von Hardware (Gateways):**
-- `mora/lora/rx` - LoRa Nachrichten von Beacons
-- `mora/beacon/{id}/telemetry` - Beacon-Telemetrie
-- `mora/checkpoint/{id}/event` - Checkpoint-Events
-
-**An Hardware:**
-- `mora/lora/tx` - LoRa Kommandos
-- `mora/display/{id}/command` - Display-Kommandos
-
-## Services
-
-### LoRa Handler
-
-Verarbeitet eingehende LoRa-Nachrichten von Beacons:
-- Telemetrie (Batterie, RSSI, IMU)
-- Checkpoint-Events
-- Crash-Alerts
-
-### Position Tracker
-
-Berechnet Position aus:
-1. BLE RSSI von 3+ Gateways (Trilateration)
-2. Checkpoint-Position (bekannt)
-3. Interpolation entlang Strecke
-
-### Lap Counter
-
-Rundenzählung-Logik:
-- Start/Ziel Checkpoint zwingend
-- Validierung: Alle Pflicht-Checkpoints passiert
-- Rundenzeit-Berechnung
-
-### Crash Detector
-
-Sturz-Erkennung aus IMU-Daten:
-- Beschleunigung >2.5G
-- Plötzliche Orientierungsänderung
-- Alert an Frontend & Display
+- LoRa-Nachrichten in Domain-Services (Lap Counter, Telemetriepersistenz) weiterverarbeiten
+- Service-Layer (Lap Counter, Position Tracker, Crash Detection) implementieren
+- WebSocket-Streaming der Telemetriedaten
+- Alembic fuer Datenbank-Migrationen konfigurieren
+- Automatisierte Tests (pytest) aufsetzen
 
 ## Troubleshooting
 
-**MQTT Connection failed:**
-- Mosquitto Broker läuft? `sudo systemctl status mosquitto`
-- Config korrekt? `config.yaml`
-
-**Database locked:**
-- SQLite nur ein Writer - zu viele parallele Zugriffe
-- Lösung: PostgreSQL für Production
-
-**WebSocket disconnects:**
-- Timeout zu kurz - in `config.yaml` erhöhen
-- Nginx Proxy? WebSocket Support aktivieren
-
-
-
+- `sqlite3.OperationalError: unable to open database file` ? sicherstellen, dass `data/` existiert und Schreibrechte vorhanden sind.
+- 404 bei `/api/...` ? pruefen, ob Server mit `uvicorn app.main:app` gestartet wurde.
+- Enum-Fehler bei Migrationen ? bei Wechsel auf PostgreSQL `alembic`-Konfiguration anpassen (SQLAlchemy Enum -> native Enum).
