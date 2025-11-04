@@ -28,7 +28,7 @@ struct TeamData {
     TeamData() : teamId(0), lapCount(0), lastLapTime(0), bestLapTime(0), isActive(false) {}
 };
 
-typedef std::function<void(uint8_t teamId, uint32_t lapCount)> LapCounterCallback;
+typedef std::function<void(const TeamData& team, int8_t rssi)> LapCounterCallback;
 
 /**
  * Lap Counter Service

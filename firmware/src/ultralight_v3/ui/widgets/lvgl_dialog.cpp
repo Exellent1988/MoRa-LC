@@ -39,12 +39,14 @@ void LVGLDialog::show(const char* title, const char* message,
     _titleLabel = lv_label_create(dialogBox);
     lv_label_set_text(_titleLabel, title);
     lv_obj_set_style_text_color(_titleLabel, rgb565ToLVGL(Colors::TEXT), 0);
+    lv_obj_set_style_text_font(_titleLabel, Fonts::get(Fonts::Size::Subtitle), 0);
     lv_obj_align(_titleLabel, LV_ALIGN_TOP_MID, 0, 10);
     
     // Message
     _messageLabel = lv_label_create(dialogBox);
     lv_label_set_text(_messageLabel, message);
     lv_obj_set_style_text_color(_messageLabel, rgb565ToLVGL(Colors::TEXT), 0);
+    lv_obj_set_style_text_font(_messageLabel, Fonts::get(Fonts::Size::Body), 0);
     lv_obj_align(_messageLabel, LV_ALIGN_CENTER, 0, -10);
     lv_label_set_long_mode(_messageLabel, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(_messageLabel, SCREEN_WIDTH - 120);
@@ -58,6 +60,7 @@ void LVGLDialog::show(const char* title, const char* message,
     lv_obj_t* okLabel = lv_label_create(_okButton);
     lv_label_set_text(okLabel, buttonText);
     lv_obj_set_style_text_color(okLabel, rgb565ToLVGL(Colors::BUTTON_TEXT), 0);
+    lv_obj_set_style_text_font(okLabel, Fonts::get(Fonts::Size::Body), 0);
     lv_obj_center(okLabel);
     
     if (callback) {
@@ -112,6 +115,7 @@ void LVGLDialog::showConfirm(const char* title, const char* message,
     
     lv_obj_t* okLabel = lv_label_create(_okButton);
     lv_label_set_text(okLabel, okText);
+    lv_obj_set_style_text_font(okLabel, Fonts::get(Fonts::Size::Body), 0);
     lv_obj_center(okLabel);
     
     if (okCallback) {
@@ -126,6 +130,7 @@ void LVGLDialog::showConfirm(const char* title, const char* message,
     
     lv_obj_t* cancelLabel = lv_label_create(_cancelButton);
     lv_label_set_text(cancelLabel, cancelText);
+    lv_obj_set_style_text_font(cancelLabel, Fonts::get(Fonts::Size::Body), 0);
     lv_obj_center(cancelLabel);
     
     if (cancelCallback) {

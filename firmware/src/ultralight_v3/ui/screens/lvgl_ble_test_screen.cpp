@@ -36,8 +36,9 @@ void LVGLBLETestScreen::onEnter() {
     createHeader("BLE Test", true);
     
     // Create status label
-    _statusLabel = createLabel("Scanning...", Spacing::MD, HEADER_HEIGHT + Spacing::SM, 
-                               SCREEN_WIDTH - 2 * Spacing::MD, 20, rgb565ToLVGL(Colors::TEXT));
+    _statusLabel = createLabel("Scanning...", Spacing::MD, HEADER_HEIGHT + Spacing::SM,
+                                SCREEN_WIDTH - 2 * Spacing::MD, 24,
+                                rgb565ToLVGL(Colors::TEXT_SECONDARY), Fonts::Size::Caption);
     
     // Create list for beacons
     int listY = HEADER_HEIGHT + Spacing::MD + 20;
@@ -98,17 +99,12 @@ void LVGLBLETestScreen::addBeaconToList(const BeaconInfo& beacon) {
     if (!_list) return;
     
     // Create list item
-    lv_obj_t* item = lv_list_add_btn(_list, LV_SYMBOL_BLUETOOTH, nullptr);
-    
-    // Create label with beacon info
     char info[128];
     snprintf(info, sizeof(info), "%s\nRSSI: %d dBm (avg: %d)", 
              beacon.macAddress.c_str(), beacon.rssi, beacon.avgRssi);
-    
-    lv_obj_t* label = lv_label_create(item);
-    lv_label_set_text(label, info);
-    lv_obj_set_style_text_color(label, rgb565ToLVGL(Colors::TEXT), 0);
-    lv_obj_align(label, LV_ALIGN_LEFT_MID, 40, 0);
+
+    lv_obj_t* item = lv_list_add_btn(_list, LV_SYMBOL_BLUETOOTH, info);
+    styleListItem(item, Fonts::Size::Body);
 }
 
 void LVGLBLETestScreen::backBtnEventHandler(lv_event_t* e) {

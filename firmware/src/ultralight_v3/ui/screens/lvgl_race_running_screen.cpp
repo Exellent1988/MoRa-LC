@@ -2,11 +2,12 @@
 #include "../navigation_lvgl.h"
 #include <Arduino.h>
 
-LVGLRaceRunningScreen::LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter)
+LVGLRaceRunningScreen::LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter, DataLoggerService* dataLogger)
     : LVGLBaseScreen(lvglDisplay)
     , _navigation(nullptr)
     , _beaconService(beaconService)
     , _lapCounter(lapCounter)
+    , _dataLogger(dataLogger)
     , _raceResultsScreen(nullptr)
     , _timeLabel(nullptr)
     , _remainingLabel(nullptr)
@@ -59,17 +60,13 @@ void LVGLRaceRunningScreen::onEnter() {
     
     // Time display (large, centered)
     int timeY = HEADER_HEIGHT + Spacing::MD;
-    _timeLabel = createLabel("00:00:00", 0, timeY, SCREEN_WIDTH, 50, rgb565ToLVGL(Colors::TEXT));
-    if (_timeLabel) {
-        lv_obj_set_style_text_align(_timeLabel, LV_TEXT_ALIGN_CENTER, 0);
-    }
+    _timeLabel = createLabel("00:00:00", 0, timeY, SCREEN_WIDTH, 50,
+                             rgb565ToLVGL(Colors::TEXT), Fonts::Size::Display, LV_TEXT_ALIGN_CENTER);
     
     // Remaining time (ASCII only)
     int remainingY = timeY + 60;
-    _remainingLabel = createLabel("Remaining: 00:00", 0, remainingY, SCREEN_WIDTH, 30, rgb565ToLVGL(Colors::TEXT_SECONDARY));
-    if (_remainingLabel) {
-        lv_obj_set_style_text_align(_remainingLabel, LV_TEXT_ALIGN_CENTER, 0);
-    }
+    _remainingLabel = createLabel("Remaining: 00:00", 0, remainingY, SCREEN_WIDTH, 30,
+                                  rgb565ToLVGL(Colors::TEXT_SECONDARY), Fonts::Size::Subtitle, LV_TEXT_ALIGN_CENTER);
     
     // Leaderboard list
     int listY = remainingY + 40;
@@ -149,6 +146,13 @@ void LVGLRaceRunningScreen::startRace(uint32_t durationMinutes) {
     _lastDisplayedTime = 0;
     _lastDisplayedRemaining = 0;
     
+    if (_dataLogger && _dataLogger->isReady()) {
+        String raceLabel = String("race_") + durationMinutes + "min";
+        if (!_dataLogger->logRaceStart(raceLabel)) {
+            Serial.println("[LVGLRaceRunning] WARNING: Failed to start race logging");
+        }
+    }
+    
     // Enable race mode in beacon service
     if (_beaconService) {
         Serial.println("[LVGLRaceRunning] Enabling race mode in beacon service...");
@@ -202,6 +206,10 @@ void LVGLRaceRunningScreen::stopRace() {
         _lapCounter->stopRace();
     }
     
+    if (_dataLogger && _dataLogger->isReady()) {
+        _dataLogger->logRaceEnd();
+    }
+    
     Serial.println("[LVGLRaceRunning] Race stopped");
     
     // Navigate to results screen
@@ -233,7 +241,7 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
     
     if (!_lapCounter) {
         lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "LapCounter not available");
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(item, Fonts::Size::Body);
         return;
     }
     
@@ -241,7 +249,7 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
     
     if (leaderboard.empty()) {
         lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "No teams");
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(item, Fonts::Size::Body);
         return;
     }
     
@@ -255,7 +263,11 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
                 count + 1, team->teamName.c_str(), team->lapCount);
         
         lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, info);
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(item, Fonts::Size::Body);
+        if (count == 0) {
+            lv_color_t color = rgb565ToLVGL(Colors::PRIMARY);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN);
+        }
         
         count++;
     }
@@ -320,11 +332,10 @@ void LVGLRaceRunningScreen::pauseBtnEventHandler(lv_event_t* e) {
 
 void LVGLRaceRunningScreen::stopBtnEventHandler(lv_event_t* e) {
     LVGLRaceRunningScreen* screen = (LVGLRaceRunningScreen*)lv_event_get_user_data(e);
-    if (screen && screen->_navigation) {
-        Serial.println("[LVGLRaceRunning] Stop button clicked");
-        screen->stopRace();
-        // TODO: Navigate to results screen
-        screen->_navigation->goBack();
+    if (!screen) {
+        return;
     }
+    Serial.println("[LVGLRaceRunning] Stop button clicked");
+    screen->stopRace();
 }
 

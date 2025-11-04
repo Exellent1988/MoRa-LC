@@ -266,7 +266,7 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
                 
                 // Notify callback
                 if (_lapCallback) {
-                    _lapCallback(pair.second.teamId, pair.second.lapCount);
+                    _lapCallback(pair.second, beacon.avgRssi);
                 }
                 
                 Serial.printf("[LapCounter] Lap detected: Team=%u (%s), Laps=%u\n",

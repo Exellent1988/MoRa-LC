@@ -2,6 +2,7 @@
 #define SD_CARD_H
 
 #include <Arduino.h>
+#include <SdFat.h>
 #include "../core/config.h"
 
 /**
@@ -21,6 +22,8 @@ public:
     bool exists(const String& path);
     bool mkdir(const String& path);
     bool remove(const String& path);
+      FsFile open(const String& path, oflag_t oflag = O_RDWR | O_CREAT);
+      void close(FsFile& file);
     
     // Info
     uint64_t getTotalSize();
@@ -30,6 +33,7 @@ public:
 private:
     bool _initialized;
     uint8_t _csPin;
+      SdFat32 _sd;
 };
 
 #endif // SD_CARD_H

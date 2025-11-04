@@ -40,7 +40,8 @@ void LVGLRaceSetupScreen::onEnter() {
     
     // Duration controls
     int y = HEADER_HEIGHT + Spacing::MD;
-    _durationLabel = createLabel("Duration:", Spacing::MD, y, 100, 30, rgb565ToLVGL(Colors::TEXT));
+    _durationLabel = createLabel("Duration:", Spacing::MD, y, 120, 30,
+                                 rgb565ToLVGL(Colors::TEXT), Fonts::Size::Subtitle);
     if (!_durationLabel) {
         Serial.println("[LVGLRaceSetup] ERROR: Failed to create duration label");
         return;
@@ -48,12 +49,12 @@ void LVGLRaceSetupScreen::onEnter() {
     y += 35;
     
     // Duration value (larger text) - center it
-    _durationValue = createLabel("60 Min", 0, y, SCREEN_WIDTH, 40, rgb565ToLVGL(Colors::TEXT));
+    _durationValue = createLabel("60 Min", 0, y, SCREEN_WIDTH, 40,
+                                 rgb565ToLVGL(Colors::TEXT), Fonts::Size::Title, LV_TEXT_ALIGN_CENTER);
     if (!_durationValue) {
         Serial.println("[LVGLRaceSetup] ERROR: Failed to create duration value label");
         return;
     }
-    lv_obj_set_style_text_align(_durationValue, LV_TEXT_ALIGN_CENTER, 0);
     
     // Duration buttons
     int btnW = 60;

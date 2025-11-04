@@ -55,7 +55,7 @@ void LVGLRaceResultsScreen::updateResultsList() {
     
     if (!_lapCounter) {
         lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "LapCounter not available");
-        lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(emptyItem, Fonts::Size::Body);
         return;
     }
     
@@ -63,7 +63,7 @@ void LVGLRaceResultsScreen::updateResultsList() {
     
     if (leaderboard.empty()) {
         lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "No results");
-        lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(emptyItem, Fonts::Size::Body);
         return;
     }
     
@@ -72,18 +72,33 @@ void LVGLRaceResultsScreen::updateResultsList() {
     for (TeamData* team : leaderboard) {
         char info[128];
         if (team->bestLapTime > 0) {
-            uint32_t seconds = team->bestLapTime / 1000;
-            uint32_t minutes = seconds / 60;
-            seconds %= 60;
-            snprintf(info, sizeof(info), "%u. %s\nLaps: %u | Best: %lu:%02lu", 
-                    rank, team->teamName.c_str(), team->lapCount, minutes, seconds);
+            uint32_t totalMillis = team->bestLapTime;
+            uint32_t minutes = totalMillis / 60000;
+            uint32_t seconds = (totalMillis % 60000) / 1000;
+            uint32_t millis = totalMillis % 1000;
+            snprintf(info, sizeof(info), "%u. %s\nLaps: %u | Best: %lu:%02lu.%03lu", 
+                    rank, team->teamName.c_str(), team->lapCount, minutes, seconds, millis);
         } else {
             snprintf(info, sizeof(info), "%u. %s\nLaps: %u", 
                     rank, team->teamName.c_str(), team->lapCount);
         }
         
         lv_obj_t* item = lv_list_add_btn(_list, LV_SYMBOL_FILE, info);
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(item, Fonts::Size::Body);
+
+        if (rank == 1) {
+            lv_color_t color = rgb565ToLVGL(Colors::PRIMARY);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN | LV_STATE_PRESSED);
+        } else if (rank == 2) {
+            lv_color_t color = rgb565ToLVGL(Colors::SECONDARY);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN | LV_STATE_PRESSED);
+        } else if (rank == 3) {
+            lv_color_t color = rgb565ToLVGL(Colors::ACCENT);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(item, color, LV_PART_MAIN | LV_STATE_PRESSED);
+        }
         
         rank++;
     }

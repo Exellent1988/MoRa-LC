@@ -11,10 +11,16 @@ LVGLTeamsScreen::LVGLTeamsScreen(LVGLDisplay* lvglDisplay, LapCounterService* la
     , _beaconAssignScreen(nullptr)
     , _teamEditScreen(nullptr)
     , _list(nullptr)
-    , _addButton(nullptr) {
+    , _addButton(nullptr)
+    , _dialog(nullptr)
+    , _pendingDeleteTeamId(0) {
 }
 
 LVGLTeamsScreen::~LVGLTeamsScreen() {
+    if (_dialog) {
+        delete _dialog;
+        _dialog = nullptr;
+    }
 }
 
 void LVGLTeamsScreen::onEnter() {
@@ -31,6 +37,12 @@ void LVGLTeamsScreen::onEnter() {
     // Clear screen
     lv_obj_clean(_screen);
     
+    if (_dialog) {
+        delete _dialog;
+        _dialog = nullptr;
+    }
+    _dialog = new LVGLDialog(_screen);
+
     // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
@@ -56,7 +68,10 @@ void LVGLTeamsScreen::onEnter() {
 }
 
 void LVGLTeamsScreen::onExit() {
-    // Cleanup if needed
+    if (_dialog) {
+        delete _dialog;
+        _dialog = nullptr;
+    }
 }
 
 void LVGLTeamsScreen::updateTeamList() {
@@ -67,7 +82,7 @@ void LVGLTeamsScreen::updateTeamList() {
     
     if (!_lapCounter) {
         lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "LapCounter not available");
-        lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(emptyItem, Fonts::Size::Body);
         return;
     }
     
@@ -75,7 +90,7 @@ void LVGLTeamsScreen::updateTeamList() {
     
     if (teams.empty()) {
         lv_obj_t* emptyItem = lv_list_add_btn(_list, LV_SYMBOL_FILE, "No teams");
-        lv_obj_set_style_bg_color(emptyItem, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(emptyItem, Fonts::Size::Body);
         return;
     }
     
@@ -91,13 +106,14 @@ void LVGLTeamsScreen::updateTeamList() {
         }
         
         lv_obj_t* item = lv_list_add_btn(_list, LV_SYMBOL_FILE, info);
-        
+        styleListItem(item, Fonts::Size::Body);
+
         // Store team ID in user data
         lv_obj_set_user_data(item, (void*)(uintptr_t)team->teamId);
-        
+
         // Click: Navigate to beacon assign
-        // Long press: Delete team (we'll add this later with a dialog)
         lv_obj_add_event_cb(item, teamItemEventHandler, LV_EVENT_CLICKED, this);
+        // Long press: Delete team (confirmation dialog)
         lv_obj_add_event_cb(item, deleteTeamEventHandler, LV_EVENT_LONG_PRESSED, this);
     }
 }
@@ -157,12 +173,29 @@ void LVGLTeamsScreen::showDeleteConfirmDialog(uint8_t teamId) {
     if (!team) return;
     
     Serial.printf("[LVGLTeams] Showing delete confirmation for team %u: %s\n", teamId, team->teamName.c_str());
-    
-    // Simple confirmation - delete directly for now
-    // TODO: Add proper LVGL dialog
-    if (_lapCounter->removeTeam(teamId)) {
-        Serial.printf("[LVGLTeams] Team %u deleted\n", teamId);
-        updateTeamList();
+    if (!_dialog) {
+        _dialog = new LVGLDialog(_screen);
+    }
+
+    _pendingDeleteTeamId = teamId;
+
+    char message[96];
+    snprintf(message, sizeof(message), "Delete team %s?", team->teamName.c_str());
+    _dialog->showConfirm("Delete Team", message, "Delete", "Cancel",
+                         confirmDeleteHandler, nullptr, this);
+}
+
+void LVGLTeamsScreen::confirmDeleteHandler(lv_event_t* e) {
+    LVGLTeamsScreen* screen = static_cast<LVGLTeamsScreen*>(lv_event_get_user_data(e));
+    if (!screen || !screen->_lapCounter) {
+        return;
+    }
+
+    if (screen->_pendingDeleteTeamId > 0 &&
+        screen->_lapCounter->removeTeam(screen->_pendingDeleteTeamId)) {
+        Serial.printf("[LVGLTeams] Team %u deleted\n", screen->_pendingDeleteTeamId);
+        screen->_pendingDeleteTeamId = 0;
+        screen->updateTeamList();
     }
 }
 

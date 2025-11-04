@@ -89,6 +89,7 @@ public:
     // Configuration
     void setMACFilter(const char* prefix);
     void setRSSIThreshold(int8_t threshold);
+      int8_t getRSSIThreshold() const { return _rssiThreshold; }
     
     // Race mode (optimizations)
     void setRaceMode(bool enabled);
@@ -106,6 +107,7 @@ private:
     
     std::map<String, BeaconInfo> _beacons;  // MAC address -> BeaconInfo
     bool _raceMode;  // Race mode: no cleanup, all callbacks
+      int8_t _rssiThreshold;
     
     // Internal BLE callback handler
     void handleRawBeacon(const BeaconRawData& raw);

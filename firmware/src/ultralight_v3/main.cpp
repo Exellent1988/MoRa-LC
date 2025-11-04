@@ -62,9 +62,9 @@ LVGLHomeScreen lvglHomeScreen(&lvglDisplay);
 LVGLBLETestScreen lvglBLETestScreen(&lvglDisplay, &beaconService);
 LVGLTeamsScreen lvglTeamsScreen(&lvglDisplay, &lapCounterService);
 LVGLRaceSetupScreen lvglRaceSetupScreen(&lvglDisplay);
-LVGLRaceRunningScreen lvglRaceRunningScreen(&lvglDisplay, &beaconService, &lapCounterService);
+LVGLRaceRunningScreen lvglRaceRunningScreen(&lvglDisplay, &beaconService, &lapCounterService, &dataLoggerService);
 LVGLRaceResultsScreen lvglRaceResultsScreen(&lvglDisplay, &lapCounterService);
-LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService);
+LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService, &lapCounterService, &beaconService);
 LVGLBeaconAssignScreen lvglBeaconAssignScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLTeamEditScreen lvglTeamEditScreen(&lvglDisplay, &lapCounterService);
 #endif
@@ -209,6 +209,12 @@ void setup() {
                     Serial.println("[Main] PersistenceService initialized");
                     lapCounterService.loadTeams(&persistenceService);
                 }
+
+                lapCounterService.setLapCallback([](const TeamData& team, int8_t rssi) {
+                    if (dataLoggerService.isReady()) {
+                        dataLoggerService.logLap(team.teamId, team.teamName, team.lapCount, rssi);
+                    }
+                });
             }
             
             if (dataLoggerService.begin(&sdCard)) {

@@ -3,6 +3,7 @@
 
 #include "lvgl_base_screen.h"
 #include "../../services/lap_counter_service.h"
+#include "../widgets/lvgl_dialog.h"
 #include <lvgl.h>
 #include <vector>
 
@@ -40,12 +41,15 @@ private:
     LVGLTeamEditScreen* _teamEditScreen;
     lv_obj_t* _list;
     lv_obj_t* _addButton;
+    LVGLDialog* _dialog;
+    uint8_t _pendingDeleteTeamId;
     
     // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
     static void addBtnEventHandler(lv_event_t* e);
     static void teamItemEventHandler(lv_event_t* e);
     static void deleteTeamEventHandler(lv_event_t* e);
+    static void confirmDeleteHandler(lv_event_t* e);
     
     // Helper methods
     void updateTeamList();

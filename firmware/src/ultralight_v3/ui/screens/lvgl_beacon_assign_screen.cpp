@@ -44,7 +44,8 @@ void LVGLBeaconAssignScreen::onEnter() {
     }
     
     _instructionLabel = createLabel(instruction.c_str(), Spacing::MD, HEADER_HEIGHT + Spacing::SM,
-                                   SCREEN_WIDTH - 2 * Spacing::MD, 30, rgb565ToLVGL(Colors::TEXT));
+                                   SCREEN_WIDTH - 2 * Spacing::MD, 30,
+                                   rgb565ToLVGL(Colors::TEXT), Fonts::Size::Subtitle);
     
     // Create beacon list
     int listY = HEADER_HEIGHT + Spacing::MD + 30;
@@ -88,7 +89,7 @@ void LVGLBeaconAssignScreen::updateBeaconList() {
     
     if (beacons.empty()) {
         lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, "No beacons found");
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        styleListItem(item, Fonts::Size::Body);
         return;
     }
     
@@ -98,6 +99,7 @@ void LVGLBeaconAssignScreen::updateBeaconList() {
         snprintf(info, sizeof(info), "%s\nRSSI: %d dBm", beacon.macAddress.c_str(), beacon.avgRssi);
         
         lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, info);
+        styleListItem(item, Fonts::Size::Body);
         lv_obj_add_event_cb(item, beaconItemEventHandler, LV_EVENT_CLICKED, this);
         
         // Store beacon UUID in user data (we'll use a simple string copy)

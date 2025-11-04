@@ -4,6 +4,7 @@
 #include "lvgl_base_screen.h"
 #include "../../services/beacon_service.h"
 #include "../../services/lap_counter_service.h"
+#include "../../services/data_logger_service.h"
 #include <lvgl.h>
 
 // Forward declarations
@@ -17,7 +18,7 @@ class LVGLRaceResultsScreen;
  */
 class LVGLRaceRunningScreen : public LVGLBaseScreen {
 public:
-    LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter);
+    LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter, DataLoggerService* dataLogger = nullptr);
     virtual ~LVGLRaceRunningScreen();
     
     void onEnter() override;
@@ -39,6 +40,7 @@ private:
     LVGLNavigation* _navigation;
     BeaconService* _beaconService;
     LapCounterService* _lapCounter;
+    DataLoggerService* _dataLogger;
     LVGLRaceResultsScreen* _raceResultsScreen;
     
     // UI elements

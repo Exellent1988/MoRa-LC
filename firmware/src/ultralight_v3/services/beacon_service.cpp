@@ -5,7 +5,8 @@
 BeaconService::BeaconService()
     : _ble(nullptr)
     , _callback(nullptr)
-    , _raceMode(false) {
+    , _raceMode(false)
+    , _rssiThreshold(BLE_RSSI_THRESHOLD) {
 }
 
 BeaconService::~BeaconService() {
@@ -24,6 +25,7 @@ bool BeaconService::begin(BLEInterface* ble) {
     _ble->setBeaconCallback([this](const BeaconRawData& raw) {
         this->handleRawBeacon(raw);
     });
+      _ble->setRSSIThreshold(_rssiThreshold);
     
     Serial.println("[BeaconService] Initialized");
     return true;
@@ -59,6 +61,7 @@ void BeaconService::setRSSIThreshold(int8_t threshold) {
     if (_ble) {
         _ble->setRSSIThreshold(threshold);
     }
+    _rssiThreshold = threshold;
 }
 
 void BeaconService::setRaceMode(bool enabled) {

@@ -70,10 +70,11 @@ MoRa-LC/
 
 **Software-Setup:**
 ```bash
-# PlatformIO installieren (VS Code Extension)
+# PlatformIO installieren (VS Code Extension oder CLI)
 # Dann:
-cd firmware/ultralight
-pio run -t upload
+cd firmware
+pio run -e ultralight_v3
+pio run -e ultralight_v3 -t upload
 ```
 
 Siehe `docs/ultralight-quickstart.md` für Details.

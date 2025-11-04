@@ -30,8 +30,12 @@ protected:
     // Helper methods for common UI elements
     lv_obj_t* createHeader(const char* title, bool showBack = false, lv_event_cb_t backHandler = nullptr, void* user_data = nullptr);
     lv_obj_t* createButton(const char* label, int x, int y, int w, int h, lv_event_cb_t event_cb, void* user_data = nullptr);
-    lv_obj_t* createLabel(const char* text, int x, int y, int w, int h, lv_color_t color = lv_color_hex(0x000000));
+    lv_obj_t* createLabel(const char* text, int x, int y, int w, int h,
+                          lv_color_t color = lv_color_hex(0x000000),
+                          Fonts::Size fontSize = Fonts::Size::Body,
+                          lv_text_align_t align = LV_TEXT_ALIGN_LEFT);
     lv_obj_t* createList(int x, int y, int w, int h);
+    void styleListItem(lv_obj_t* item, Fonts::Size fontSize = Fonts::Size::Body);
     
     // Color conversion helpers
     static lv_color_t rgb565ToLVGL(uint16_t rgb565);

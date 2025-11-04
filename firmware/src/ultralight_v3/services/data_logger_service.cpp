@@ -37,22 +37,44 @@ bool DataLoggerService::createRaceFile(const String& raceName) {
     
     closeRaceFile(); // Close previous file if open
     
-    _currentRaceName = raceName;
+    // Sanitize race name for filename
+    String sanitized = raceName;
+    sanitized.replace(" ", "_");
+    sanitized.replace("/", "_");
+    sanitized.replace("\\", "_");
+    sanitized.replace(":", "_");
+    sanitized.replace("*", "_");
+    sanitized.replace("?", "_");
+    sanitized.replace("\"", "_");
+    sanitized.replace("<", "_");
+    sanitized.replace(">", "_");
+    sanitized.replace("|", "_");
+    if (sanitized.length() == 0) {
+        sanitized = "race";
+    }
+    if (sanitized.length() > 24) {
+        sanitized = sanitized.substring(0, 24);
+    }
     
     // Create filename with timestamp
-    char filename[64];
-    snprintf(filename, sizeof(filename), "/races/race_%lu.csv", millis());
+    char filename[96];
+    snprintf(filename, sizeof(filename), "/races/%lu_%s.csv", millis(), sanitized.c_str());
     
-    // TODO: Use SDCard interface to create file
-    // For now, just set the name
+    _raceFile = _sdCard->open(filename, O_RDWR | O_CREAT | O_TRUNC);
+    if (!_raceFile) {
+        Serial.printf("[DataLogger] ERROR: Failed to open race file %s\n", filename);
+        return false;
+    }
+    
+    _currentRaceName = String(filename);
+    _lastFlush = millis();
     Serial.printf("[DataLogger] Race file created: %s\n", filename);
-    
     return true;
 }
 
 void DataLoggerService::closeRaceFile() {
     if (_raceFile.isOpen()) {
-        _raceFile.close();
+        _sdCard->close(_raceFile);
     }
     _currentRaceName = "";
 }
@@ -113,15 +135,22 @@ void DataLoggerService::flushQueue() {
         writeEntry(entry);
         _logQueue.pop();
     }
+    if (_raceFile.isOpen()) {
+        _raceFile.sync();
+    }
 }
 
 bool DataLoggerService::writeEntry(const LogEntry& entry) {
     if (!_raceFile.isOpen()) return false;
     
     // Write to file
-    _raceFile.print(entry.data.c_str());
+    size_t expected = entry.data.length();
+    size_t written = _raceFile.print(entry.data.c_str());
+    if (written != expected) {
+        Serial.printf("[DataLogger] ERROR: Write failed (%u/%u bytes)\n", (unsigned)written, (unsigned)expected);
+        return false;
+    }
     Serial.printf("[DataLogger] %s", entry.data.c_str());
-    
     return true;
 }
 
