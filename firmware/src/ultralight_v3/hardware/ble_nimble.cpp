@@ -102,7 +102,7 @@ bool BLENimBLE::begin() {
     _callbacks = new AdvertisedDeviceCallbacks(this);
     _pBLEScan->setAdvertisedDeviceCallbacks(_callbacks, false);  // false = wantDuplicates
     
-    _pBLEScan->setActiveScan(true);      // Active scan
+    _pBLEScan->setActiveScan(false);     // Passive scan: lower latency for RSSI detection
     _pBLEScan->setInterval(BLE_SCAN_INTERVAL);
     _pBLEScan->setWindow(BLE_SCAN_WINDOW);
     _pBLEScan->setDuplicateFilter(false);  // Report duplicates (needed for updates)
@@ -139,8 +139,6 @@ bool BLENimBLE::startScan(uint32_t durationMs) {
     // 3-param overload is NON-BLOCKING (2-param is blocking!)
     _pBLEScan->start(scanDuration, nullptr, false);
     
-    // Disable logging again after start
-    delay(10);
     disableLogging();
     
     return true;

@@ -25,7 +25,7 @@ struct BeaconInfo {
     bool isPresent;     // Currently present (above threshold)
     
     // RSSI averaging (circular buffer)
-    static constexpr uint8_t RSSI_HISTORY_SIZE = 5;
+    static constexpr uint8_t RSSI_HISTORY_SIZE = 3;
     int8_t rssiHistory[RSSI_HISTORY_SIZE];
     uint8_t rssiHistoryIndex;
     uint8_t rssiHistoryCount;

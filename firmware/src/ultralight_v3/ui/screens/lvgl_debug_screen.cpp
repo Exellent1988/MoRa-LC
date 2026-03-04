@@ -94,9 +94,9 @@ void LVGLDebugScreen::refreshList() {
             bgColor = Colors::WARNING;    // orange
         }
         
-        snprintf(info, sizeof(info), "%s [%s] %d dBm %s L%u",
+        snprintf(info, sizeof(info), "%s [%s] %d/%d %s L%u",
                  team->teamName.c_str(), macSuffix(team->beaconUUID),
-                 beacon->avgRssi, status, team->lapCount);
+                 beacon->rssi, beacon->avgRssi, status, team->lapCount);
         
         lv_obj_t* item = lv_list_add_btn(_list, NULL, info);
         lv_obj_set_height(item, 26);

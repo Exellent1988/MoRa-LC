@@ -301,13 +301,13 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
 }
 
 bool LapCounterService::detectLap(const String& beaconUUID, const BeaconInfo& beacon) {
-    // Hysteresis lap detection:
-    // "present" when RSSI >= _rssiNear, "absent" when RSSI <= _rssiFar
-    // RSSI between far and near: keep previous state (deadband)
+    // Hysteresis with fast-trigger:
+    // NEAR: use RAW rssi (single strong reading triggers immediately)
+    // FAR:  use avgRssi (smoothed, prevents false "absent" from one weak reading)
     bool wasPresent = _beaconPresence[beaconUUID];
     bool isPresent = wasPresent;
     
-    if (beacon.avgRssi >= _rssiNear) {
+    if (beacon.rssi >= _rssiNear) {
         isPresent = true;
     } else if (beacon.avgRssi <= _rssiFar) {
         isPresent = false;
@@ -315,7 +315,6 @@ bool LapCounterService::detectLap(const String& beaconUUID, const BeaconInfo& be
     
     _beaconPresence[beaconUUID] = isPresent;
     
-    // Lap on transition: was absent, now present (+ min lap time)
     if (!wasPresent && isPresent) {
         uint32_t now = millis();
         auto lastTimeIt = _lastLapTime.find(beaconUUID);

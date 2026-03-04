@@ -200,7 +200,7 @@ void LVGLSettingsScreen::minLapTimeEventHandler(lv_event_t* e) {
     LVGLSettingsScreen* screen = (LVGLSettingsScreen*)lv_event_get_user_data(e);
     if (!screen || !screen->_lapCounter) return;
     int32_t current = (int32_t)(screen->_lapCounter->getMinLapTime() / 1000);
-    screen->showValueEditor("Min Lap Time (s)", current, 5, 120, 1, 0);
+    screen->showValueEditor("Min Lap Time (s)", current, 1, 120, 1, 0);
 }
 
 void LVGLSettingsScreen::updateMinLapTimeLabel() {
