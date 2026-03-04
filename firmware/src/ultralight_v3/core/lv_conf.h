@@ -11,7 +11,7 @@
 
 /*Color depth: 16 = RGB565 (matches LovyanGFX)*/
 #define LV_COLOR_DEPTH 16
-#define LV_COLOR_16_SWAP 0
+#define LV_COLOR_16_SWAP 1
 
 /*Memory pool size (32KB for ESP32)*/
 #define LV_MEM_SIZE (32U * 1024U)

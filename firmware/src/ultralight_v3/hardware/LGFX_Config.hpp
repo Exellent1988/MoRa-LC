@@ -51,8 +51,8 @@ public:
             cfg.dummy_read_pixel = 8;
             cfg.dummy_read_bits = 1;
             cfg.readable = true;
-            cfg.invert = false;
-            cfg.rgb_order = false;
+            cfg.invert = true;
+            cfg.rgb_order = true;   /* ST7789: BGR order - fixes red/blue swap */
             cfg.dlen_16bit = false;
             cfg.bus_shared = false;            // Display has its own SPI bus
             _panel_instance.config(cfg);

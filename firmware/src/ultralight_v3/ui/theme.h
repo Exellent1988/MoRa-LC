@@ -7,6 +7,11 @@
 /**
  * UI Theme System
  * Unified design system with colors, spacing, typography, and icons
+ *
+ * Display color mapping (ESP32-2432S028 + LV_COLOR_16_SWAP=1):
+ * - 0x07E0 = green (correct)
+ * - 0xF800 = orange (expected red)
+ * - 0x001F = green (expected blue) -> use 0x07E0 for header
  */
 
 // Color Palette (RGB565)
@@ -32,8 +37,8 @@ namespace Colors {
     constexpr uint16_t BUTTON = 0x8410;        // Medium Gray
     constexpr uint16_t BUTTON_TEXT = 0x0000;   // Black
     constexpr uint16_t BUTTON_PRESSED = 0x630C; // Darker Gray
-    constexpr uint16_t HEADER_BG = 0x07E0;     // Green (Secondary color)
-    constexpr uint16_t HEADER_TEXT = 0xFFFF;   // White (for better contrast on green)
+    constexpr uint16_t HEADER_BG = 0x07e0;     // Green (0x001F blue shows wrong with LV_COLOR_16_SWAP=1 on this display)
+    constexpr uint16_t HEADER_TEXT = 0xFFFF;   // White
     
     // List Colors
     constexpr uint16_t LIST_ITEM = 0x8410;     // Medium Gray

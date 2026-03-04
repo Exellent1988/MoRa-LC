@@ -105,13 +105,20 @@ void LVGLRaceRunningScreen::onExit() {
 void LVGLRaceRunningScreen::update() {
     if (!_isRunning || !_timeLabel || !_remainingLabel) return;
     
+    // Auto-stop when race time is up
+    uint32_t remaining = getRemainingTime();
+    if (remaining == 0 && !_isPaused) {
+        Serial.println("[LVGLRaceRunning] Race time finished - auto stopping");
+        stopRace();
+        return;
+    }
+    
     // Performance: Only update display every 100ms (10fps for time display is enough)
     uint32_t now = millis();
     if (now - _lastUpdate < 100) return;
     _lastUpdate = now;
     
     uint32_t elapsed = getElapsedTime();
-    uint32_t remaining = getRemainingTime();
     
     // Only update if values changed (performance optimization)
     if (elapsed != _lastDisplayedTime) {
@@ -323,8 +330,7 @@ void LVGLRaceRunningScreen::stopBtnEventHandler(lv_event_t* e) {
     if (screen && screen->_navigation) {
         Serial.println("[LVGLRaceRunning] Stop button clicked");
         screen->stopRace();
-        // TODO: Navigate to results screen
-        screen->_navigation->goBack();
+        // stopRace() already navigates to results screen via _navigation->setScreen(_raceResultsScreen)
     }
 }
 

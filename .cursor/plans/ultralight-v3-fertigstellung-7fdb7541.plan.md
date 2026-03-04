@@ -1,4 +1,31 @@
-<!-- 7fdb7541-5f31-43d8-905d-3ba37f231a29 cccabef8-b5f3-4d52-868e-ae9abd99563a -->
+---
+name: UltraLight v3 Firmware - Fertigstellung & Code-Review
+overview: ""
+todos:
+  - id: 88e6f82d-ec0c-45b2-8849-73b10c4e8990
+    content: "SD Card Integration im DataLoggerService: Datei-Erstellung, CSV-Header, Log-Entries schreiben"
+    status: completed
+  - id: c7a76683-a8bc-4010-b339-d934bb401099
+    content: Race Results Screen mit Daten aus LapCounterService füllen (Leaderboard, Zeiten)
+    status: completed
+  - id: 5e54b46a-1b84-4806-9121-981f602385ec
+    content: Navigation von Race Running Screen zu Results Screen beim Stop implementieren
+    status: completed
+  - id: f3d730af-15fb-4fdf-a42e-bf699408f0aa
+    content: "Settings Screen: Teams-Speicherung über PersistenceService implementieren"
+    status: completed
+  - id: 5aaedcc9-edd2-4d76-8e5f-5cccadc983bb
+    content: "Settings Screen: BLE Settings Dialog/Screen hinzufügen"
+    status: completed
+  - id: 26240bd2-58d1-41de-b244-2ee59480ca20
+    content: Kompilierung prüfen und Fehler beheben
+    status: completed
+  - id: f527129d-66ab-4724-8181-5e88e5830234
+    content: "UI-Flows testen: Navigation zwischen allen Screens, Touch-Interaktionen"
+    status: in_progress
+isProject: false
+---
+
 # UltraLight v3 Firmware - Fertigstellung & Code-Review
 
 ## Aktueller Stand
@@ -195,15 +222,15 @@ Die ultralight_v3 Firmware ist ein kompletter Rewrite mit Clean Architecture. Di
 
 **Mittel (für vollständige Funktionalität):**
 
-6. BLE Scan-Verifikation
-7. Settings: Teams speichern
-8. Settings: BLE Settings
-9. Dialog-System
+1. BLE Scan-Verifikation
+2. Settings: Teams speichern
+3. Settings: BLE Settings
+4. Dialog-System
 
 **Niedrig (kosmetisch):**
 
-10. Icon-System
-11. Polishing/UI-Verbesserungen
+1. Icon-System
+2. Polishing/UI-Verbesserungen
 
 ## Nächste Schritte
 
@@ -214,12 +241,3 @@ Die ultralight_v3 Firmware ist ein kompletter Rewrite mit Clean Architecture. Di
 5. Dokumentation aktualisieren
 6. Testing vorbereiten
 
-### To-dos
-
-- [ ] SD Card Integration im DataLoggerService: Datei-Erstellung, CSV-Header, Log-Entries schreiben
-- [ ] Race Results Screen mit Daten aus LapCounterService füllen (Leaderboard, Zeiten)
-- [ ] Navigation von Race Running Screen zu Results Screen beim Stop implementieren
-- [ ] Settings Screen: Teams-Speicherung über PersistenceService implementieren
-- [ ] Settings Screen: BLE Settings Dialog/Screen hinzufügen
-- [ ] Kompilierung prüfen und Fehler beheben
-- [ ] UI-Flows testen: Navigation zwischen allen Screens, Touch-Interaktionen

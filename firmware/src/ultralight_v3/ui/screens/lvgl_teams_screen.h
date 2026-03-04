@@ -41,11 +41,14 @@ private:
     lv_obj_t* _list;
     lv_obj_t* _addButton;
     
+    uint8_t _pendingDeleteTeamId;  // Team ID pending deletion confirmation
+
     // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
     static void addBtnEventHandler(lv_event_t* e);
     static void teamItemEventHandler(lv_event_t* e);
     static void deleteTeamEventHandler(lv_event_t* e);
+    static void deleteConfirmHandler(lv_event_t* e);
     
     // Helper methods
     void updateTeamList();

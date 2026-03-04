@@ -1,7 +1,6 @@
 #include "data_logger_service.h"
 #include "../hardware/sd_card.h"
 #include <SD.h>
-#include <SdFat.h>
 #include <Arduino.h>
 
 DataLoggerService::DataLoggerService()
