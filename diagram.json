@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "author": "MoRa-LC",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "id": "esp32",
+      "type": "board-esp32-devkit-c-v4",
+      "left": 50,
+      "top": 50
+    },
+    {
+      "id": "display",
+      "type": "wokwi-st7789",
+      "left": 400,
+      "top": 100,
+      "attrs": {
+        "width": "240",
+        "height": "320",
+        "swapXY": "1"
+      }
+    },
+    {
+      "id": "touch",
+      "type": "wokwi-xpt2046",
+      "left": 400,
+      "top": 380
+    },
+    {
+      "id": "sd",
+      "type": "wokwi-microsd-card",
+      "left": 50,
+      "top": 380
+    }
+  ],
+  "connections": [
+    ["esp32:3V3", "display:VCC", "red", []],
+    ["esp32:GND.1", "display:GND", "black", []],
+    ["esp32:15", "display:CS", "green", []],
+    ["esp32:2", "display:DC", "green", []],
+    ["esp32:14", "display:SCK", "blue", []],
+    ["esp32:13", "display:MOSI", "blue", []],
+    ["esp32:12", "display:MISO", "blue", []],
+    ["esp32:3V3", "touch:VCC", "red", []],
+    ["esp32:GND.2", "touch:GND", "black", []],
+    ["esp32:33", "touch:CS", "green", []],
+    ["esp32:32", "touch:MOSI", "blue", []],
+    ["esp32:39", "touch:MISO", "blue", []],
+    ["esp32:25", "touch:CLK", "blue", []],
+    ["esp32:36", "touch:IRQ", "orange", []],
+    ["esp32:3V3", "sd:VCC", "red", []],
+    ["esp32:GND.3", "sd:GND", "black", []],
+    ["esp32:5", "sd:CS", "green", []],
+    ["esp32:18", "sd:SCK", "blue", []],
+    ["esp32:23", "sd:DI", "blue", []],
+    ["esp32:19", "sd:DO", "blue", []]
+  ],
+  "serialMonitor": {
+    "display": "default",
+    "baudRate": 115200
+  }
+}

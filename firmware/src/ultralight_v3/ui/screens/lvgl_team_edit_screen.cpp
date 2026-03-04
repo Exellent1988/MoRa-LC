@@ -38,23 +38,19 @@ void LVGLTeamEditScreen::onEnter() {
     // Create header
     createHeader(_teamId == 0 ? "New Team" : "Edit Team", true, backBtnEventHandler, this);
     
-    // Name label
-    int y = HEADER_HEIGHT + Spacing::SM;
-    createLabel("Team Name:", Spacing::MD, y, 150, 20, rgb565ToLVGL(Colors::TEXT));
-    y += 24;
-    
-    // Text area for team name
+    // Text area right below header
+    int y = HEADER_HEIGHT + 2;
     _nameTextArea = lv_textarea_create(_screen);
-    lv_obj_set_size(_nameTextArea, SCREEN_WIDTH - 2 * Spacing::MD, 35);
-    lv_obj_set_pos(_nameTextArea, Spacing::MD, y);
-    lv_textarea_set_placeholder_text(_nameTextArea, "Enter team name");
+    lv_obj_set_size(_nameTextArea, SCREEN_WIDTH - 2 * Spacing::SM, 28);
+    lv_obj_set_pos(_nameTextArea, Spacing::SM, y);
+    lv_textarea_set_placeholder_text(_nameTextArea, "Team name");
     lv_textarea_set_one_line(_nameTextArea, true);
     lv_obj_set_style_bg_color(_nameTextArea, rgb565ToLVGL(Colors::SURFACE), 0);
     lv_obj_set_style_text_color(_nameTextArea, rgb565ToLVGL(Colors::TEXT), 0);
     lv_obj_set_style_border_width(_nameTextArea, 1, 0);
     lv_obj_set_style_border_color(_nameTextArea, rgb565ToLVGL(Colors::BORDER), 0);
+    lv_obj_set_style_pad_ver(_nameTextArea, 4, 0);
     
-    // If editing existing team, load name
     if (_teamId > 0 && _lapCounter) {
         TeamData* team = _lapCounter->getTeam(_teamId);
         if (team) {
@@ -62,15 +58,18 @@ void LVGLTeamEditScreen::onEnter() {
         }
     }
     
-    y += 39;
+    y += 30;
     
-    // Keyboard fills remaining space (uses built-in OK/Cancel keys)
+    // Keyboard fills all remaining space
     _keyboard = lv_keyboard_create(_screen);
     lv_keyboard_set_textarea(_keyboard, _nameTextArea);
     lv_keyboard_set_mode(_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
     lv_obj_set_size(_keyboard, SCREEN_WIDTH, SCREEN_HEIGHT - y);
-    lv_obj_set_pos(_keyboard, 0, y);
+    // Override LVGL's default BOTTOM_MID alignment to pin keyboard right below textarea
+    lv_obj_align(_keyboard, LV_ALIGN_TOP_LEFT, 0, y);
     lv_obj_set_style_bg_color(_keyboard, rgb565ToLVGL(Colors::BACKGROUND), 0);
+    lv_obj_set_style_pad_all(_keyboard, 2, 0);
+    lv_obj_set_style_pad_gap(_keyboard, 2, 0);
     lv_obj_add_event_cb(_keyboard, keyboardEventHandler, LV_EVENT_READY, this);
     lv_obj_add_event_cb(_keyboard, keyboardEventHandler, LV_EVENT_CANCEL, this);
     

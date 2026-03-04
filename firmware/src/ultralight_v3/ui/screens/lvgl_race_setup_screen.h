@@ -4,14 +4,9 @@
 #include "lvgl_base_screen.h"
 #include <lvgl.h>
 
-// Forward declarations
 class LVGLNavigation;
 class LVGLRaceRunningScreen;
 
-/**
- * Race Setup Screen (LVGL8)
- * Configure race settings before starting
- */
 class LVGLRaceSetupScreen : public LVGLBaseScreen {
 public:
     LVGLRaceSetupScreen(LVGLDisplay* lvglDisplay);
@@ -21,32 +16,36 @@ public:
     void onExit() override;
     void update() override {}
     
-    // Set navigation for back button
     void setNavigation(LVGLNavigation* nav) { _navigation = nav; }
-    
-    // Set race running screen for navigation
     void setRaceRunningScreen(LVGLRaceRunningScreen* screen) { _raceRunningScreen = screen; }
+    
+    const char* getRaceName() const;
     
 private:
     LVGLNavigation* _navigation;
     LVGLRaceRunningScreen* _raceRunningScreen;
-    lv_obj_t* _durationLabel;
+    
+    // Controls container (hidden when keyboard is visible)
+    lv_obj_t* _controlsContainer;
+    lv_obj_t* _nameTextArea;
     lv_obj_t* _durationValue;
-    lv_obj_t* _btnDurationMinus;
-    lv_obj_t* _btnDurationPlus;
     lv_obj_t* _btnStart;
+    lv_obj_t* _keyboard;
     
-    uint32_t _raceDuration;  // in minutes
+    uint32_t _raceDuration;
+    bool _keyboardVisible;
     
-    // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
     static void durationMinusEventHandler(lv_event_t* e);
     static void durationPlusEventHandler(lv_event_t* e);
+    static void durationBigPlusEventHandler(lv_event_t* e);
     static void startBtnEventHandler(lv_event_t* e);
+    static void nameTextAreaEventHandler(lv_event_t* e);
+    static void keyboardEventHandler(lv_event_t* e);
     
-    // Helper methods
     void updateDurationDisplay();
+    void showKeyboard();
+    void hideKeyboard();
 };
 
 #endif // LVGL_RACE_SETUP_SCREEN_H
-

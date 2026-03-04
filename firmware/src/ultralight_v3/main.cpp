@@ -34,6 +34,7 @@
 #include "ui/screens/lvgl_beacon_assign_screen.h"
 #include "ui/screens/lvgl_team_edit_screen.h"
 #include "ui/screens/lvgl_test_screen.h"
+#include "ui/screens/lvgl_debug_screen.h"
 #include "ui/widgets/dialog_manager.h"
 #endif
 
@@ -68,6 +69,7 @@ LVGLRaceResultsScreen lvglRaceResultsScreen(&lvglDisplay, &lapCounterService);
 LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService, &lapCounterService);
 LVGLBeaconAssignScreen lvglBeaconAssignScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLTeamEditScreen lvglTeamEditScreen(&lvglDisplay, &lapCounterService);
+LVGLDebugScreen lvglDebugScreen(&lvglDisplay, &beaconService, &lapCounterService);
 #endif
 
 // ============================================================
@@ -178,7 +180,11 @@ void setup() {
     lvglRaceRunningScreen.setNavigation(&lvglNavigation);
     lvglRaceRunningScreen.setRaceResultsScreen(&lvglRaceResultsScreen);
     lvglRaceResultsScreen.setNavigation(&lvglNavigation);
+    lvglRaceResultsScreen.setHomeScreen(&lvglHomeScreen);
+    lvglRaceResultsScreen.setDataLogger(&dataLoggerService);
     lvglSettingsScreen.setNavigation(&lvglNavigation);
+    lvglSettingsScreen.setDebugScreen(&lvglDebugScreen);
+    lvglDebugScreen.setNavigation(&lvglNavigation);
     
     // Color test via LVGL (same rendering path as actual UI)
     #ifdef COLOR_TEST_MODE
@@ -300,12 +306,25 @@ void setup() {
                     Serial.println("[Main] PersistenceService initialized");
                     lapCounterService.loadTeams(&persistenceService);
                     lapCounterService.setPersistenceService(&persistenceService);
+                    
+                    // Load persisted race settings
+                    int32_t savedMinLap = persistenceService.loadInt("minLapTime", MIN_LAP_TIME);
+                    lapCounterService.setMinLapTime((uint32_t)savedMinLap);
+                    int8_t savedNear = (int8_t)persistenceService.loadInt("rssiNear", DEFAULT_LAP_RSSI_NEAR);
+                    int8_t savedFar = (int8_t)persistenceService.loadInt("rssiFar", DEFAULT_LAP_RSSI_FAR);
+                    lapCounterService.setRssiNear(savedNear);
+                    lapCounterService.setRssiFar(savedFar);
+                    Serial.printf("[Main] Min lap: %lds, RSSI near: %d, far: %d\n",
+                                  savedMinLap / 1000, savedNear, savedFar);
                     Serial.println("[Main] Auto-save enabled for team changes");
                 }
             }
             
             if (dataLoggerService.begin(&sdCard)) {
                 Serial.println("[Main] DataLoggerService initialized");
+                lapCounterService.setDataLogger(&dataLoggerService);
+                lvglRaceRunningScreen.setDataLogger(&dataLoggerService);
+                Serial.println("[Main] DataLogger wired into race flow");
             }
             
             // Start BLE scanning in background (LapCounter callback already set by begin())

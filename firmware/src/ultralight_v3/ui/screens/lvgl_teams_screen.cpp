@@ -81,14 +81,17 @@ void LVGLTeamsScreen::updateTeamList() {
         return;
     }
     
-    // Add teams to list (ASCII only)
     for (TeamData* team : teams) {
         char info[128];
         if (team->beaconUUID.length() > 0) {
-            snprintf(info, sizeof(info), "%u. %s\nBeacon: %.12s", 
-                    team->teamId, team->teamName.c_str(), team->beaconUUID.c_str());
+            // Show only unique suffix (last 5 chars, e.g. "d9:2b")
+            const char* mac = team->beaconUUID.c_str();
+            int len = team->beaconUUID.length();
+            const char* suffix = (len > 5) ? mac + len - 5 : mac;
+            snprintf(info, sizeof(info), "%u. %s [%s]", 
+                    team->teamId, team->teamName.c_str(), suffix);
         } else {
-            snprintf(info, sizeof(info), "%u. %s\nNo Beacon", 
+            snprintf(info, sizeof(info), "%u. %s (no beacon)", 
                     team->teamId, team->teamName.c_str());
         }
         

@@ -80,8 +80,7 @@ void BeaconService::cleanupOldBeacons(uint32_t maxAge) {
     
     while (it != _beacons.end()) {
         if (now - it->second.lastSeen > maxAge) {
-            Serial.printf("[BeaconService] Removing old beacon: %s (age: %lu ms)\n",
-                         it->first.c_str(), now - it->second.lastSeen);
+            Serial.printf("[Beacon] Removed: %s\n", it->first.c_str());
             it = _beacons.erase(it);
         } else {
             ++it;

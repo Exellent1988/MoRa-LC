@@ -19,7 +19,7 @@ public:
               lv_event_cb_t callback = nullptr, void* user_data = nullptr);
     
     void showConfirm(const char* title, const char* message,
-                     const char* okText = "OK", const char* cancelText = "Abbrechen",
+                     const char* okText = "OK", const char* cancelText = "Cancel",
                      lv_event_cb_t okCallback = nullptr, lv_event_cb_t cancelCallback = nullptr,
                      void* user_data = nullptr);
     

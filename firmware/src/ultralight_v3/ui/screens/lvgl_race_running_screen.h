@@ -6,15 +6,10 @@
 #include "../../services/lap_counter_service.h"
 #include <lvgl.h>
 
-// Forward declarations
 class LVGLNavigation;
 class LVGLRaceResultsScreen;
+class DataLoggerService;
 
-/**
- * Race Running Screen (LVGL8)
- * Display race progress, lap counts, and leaderboard
- * CRITICAL: Optimized for performance - only updates changed values
- */
 class LVGLRaceRunningScreen : public LVGLBaseScreen {
 public:
     LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter);
@@ -22,16 +17,13 @@ public:
     
     void onEnter() override;
     void onExit() override;
-    void update() override;  // Called frequently for dynamic updates
+    void update() override;
     
-    // Set navigation for back button
     void setNavigation(LVGLNavigation* nav) { _navigation = nav; }
-    
-    // Set race results screen for navigation
     void setRaceResultsScreen(LVGLRaceResultsScreen* screen) { _raceResultsScreen = screen; }
+    void setDataLogger(DataLoggerService* logger) { _dataLogger = logger; }
     
-    // Race control
-    void startRace(uint32_t durationMinutes);
+    void startRace(uint32_t durationMinutes, const char* raceName = nullptr);
     void pauseRace();
     void stopRace();
     
@@ -40,23 +32,36 @@ private:
     BeaconService* _beaconService;
     LapCounterService* _lapCounter;
     LVGLRaceResultsScreen* _raceResultsScreen;
+    DataLoggerService* _dataLogger;
     
-    // UI elements
-    lv_obj_t* _timeLabel;
-    lv_obj_t* _remainingLabel;
+    // Two-view system: time view (default) and board view
+    bool _showBoard;
+    
+    // Time view elements
+    lv_obj_t* _timeViewContainer;
+    lv_obj_t* _bigTimeLabel;
+    lv_obj_t* _bigRemainingLabel;
+    
+    // Board view elements
+    lv_obj_t* _boardViewContainer;
+    lv_obj_t* _smallTimeLabel;
     lv_obj_t* _leaderboardList;
+    
+    // Shared elements
+    lv_obj_t* _timeLabel;       // alias for active time label
+    lv_obj_t* _remainingLabel;  // alias for active remaining label
     lv_obj_t* _pauseButton;
     lv_obj_t* _stopButton;
+    lv_obj_t* _viewButton;
     
     // Race state
     uint32_t _raceStartTime;
-    uint32_t _raceDuration;  // in milliseconds
+    uint32_t _raceDuration;
     bool _isRunning;
     bool _isPaused;
     uint32_t _pausedTime;
     uint32_t _lastUpdate;
     
-    // Performance optimization: Only update if values changed
     uint32_t _lastDisplayedTime;
     uint32_t _lastDisplayedRemaining;
     
@@ -64,9 +69,9 @@ private:
     static void backBtnEventHandler(lv_event_t* e);
     static void pauseBtnEventHandler(lv_event_t* e);
     static void stopBtnEventHandler(lv_event_t* e);
+    static void viewBtnEventHandler(lv_event_t* e);
     
-    // Helper methods
-    void updateTimeDisplay();
+    void switchView();
     void updateLeaderboard();
     uint32_t getElapsedTime() const;
     uint32_t getRemainingTime() const;
@@ -74,4 +79,3 @@ private:
 };
 
 #endif // LVGL_RACE_RUNNING_SCREEN_H
-

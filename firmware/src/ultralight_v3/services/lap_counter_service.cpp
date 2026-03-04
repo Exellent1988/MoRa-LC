@@ -1,14 +1,19 @@
 #include "lap_counter_service.h"
 #include "persistence_service.h"
+#include "data_logger_service.h"
 #include <algorithm>
 #include <ArduinoJson.h>
 
 LapCounterService::LapCounterService()
     : _beaconService(nullptr)
     , _persistence(nullptr)
+    , _dataLogger(nullptr)
     , _nextTeamId(1)
     , _raceActive(false)
-    , _raceStartTime(0) {
+    , _raceStartTime(0)
+    , _minLapTime(MIN_LAP_TIME)
+    , _rssiNear(DEFAULT_LAP_RSSI_NEAR)
+    , _rssiFar(DEFAULT_LAP_RSSI_FAR) {
 }
 
 LapCounterService::~LapCounterService() {
@@ -124,7 +129,17 @@ void LapCounterService::startRace() {
     _beaconPresence.clear();
     _lastLapTime.clear();
     
-    Serial.println("[LapCounter] Race started");
+    // Pre-seed: mark all assigned beacons as "present" and set their last lap
+    // time to now so the first detection doesn't immediately count as a lap
+    uint32_t now = millis();
+    for (auto& pair : _teams) {
+        if (pair.second.beaconUUID.length() > 0) {
+            _beaconPresence[pair.second.beaconUUID] = true;
+            _lastLapTime[pair.second.beaconUUID] = now;
+        }
+    }
+    
+    Serial.printf("[LapCounter] Race started (minLapTime=%lus)\n", _minLapTime / 1000);
 }
 
 void LapCounterService::stopRace() {
@@ -266,6 +281,12 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
                 
                 _lastLapTime[beacon.macAddress] = now;
                 
+                // Log to SD card
+                if (_dataLogger) {
+                    _dataLogger->logLap(pair.second.teamId, pair.second.teamName, 
+                                       pair.second.lapCount, beacon.avgRssi);
+                }
+                
                 // Notify callback
                 if (_lapCallback) {
                     _lapCallback(pair.second.teamId, pair.second.lapCount);
@@ -280,19 +301,27 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
 }
 
 bool LapCounterService::detectLap(const String& beaconUUID, const BeaconInfo& beacon) {
-    // Simple lap detection: beacon crosses threshold (near -> far -> near)
+    // Hysteresis lap detection:
+    // "present" when RSSI >= _rssiNear, "absent" when RSSI <= _rssiFar
+    // RSSI between far and near: keep previous state (deadband)
     bool wasPresent = _beaconPresence[beaconUUID];
-    bool isPresent = beacon.avgRssi >= DEFAULT_LAP_RSSI_NEAR;
+    bool isPresent = wasPresent;
+    
+    if (beacon.avgRssi >= _rssiNear) {
+        isPresent = true;
+    } else if (beacon.avgRssi <= _rssiFar) {
+        isPresent = false;
+    }
     
     _beaconPresence[beaconUUID] = isPresent;
     
-    // Detect crossing: was far, now near (and enough time passed)
+    // Lap on transition: was absent, now present (+ min lap time)
     if (!wasPresent && isPresent) {
         uint32_t now = millis();
         auto lastTimeIt = _lastLapTime.find(beaconUUID);
         
         if (lastTimeIt == _lastLapTime.end() || 
-            (now - lastTimeIt->second) >= MIN_LAP_TIME) {
+            (now - lastTimeIt->second) >= _minLapTime) {
             return true;
         }
     }

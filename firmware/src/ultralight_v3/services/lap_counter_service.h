@@ -8,8 +8,9 @@
 #include <vector>
 #include <map>
 
-// Forward declaration
+// Forward declarations
 class PersistenceService;
+class DataLoggerService;
 
 /**
  * Lap Counter Service
@@ -43,8 +44,9 @@ public:
     bool begin(BeaconService* beaconService);
     void end();
     
-    // Persistence
+    // Persistence & Logging
     void setPersistenceService(PersistenceService* persistence) { _persistence = persistence; }
+    void setDataLogger(DataLoggerService* logger) { _dataLogger = logger; }
     bool saveTeams(PersistenceService* persistence);
     bool loadTeams(PersistenceService* persistence);
     
@@ -63,6 +65,16 @@ public:
     void resetRace();
     bool isRaceActive() const { return _raceActive; }
     
+    // Min lap time (ms)
+    void setMinLapTime(uint32_t ms) { _minLapTime = ms; }
+    uint32_t getMinLapTime() const { return _minLapTime; }
+    
+    // RSSI thresholds for lap detection (hysteresis)
+    void setRssiNear(int8_t val) { _rssiNear = val; }
+    void setRssiFar(int8_t val) { _rssiFar = val; }
+    int8_t getRssiNear() const { return _rssiNear; }
+    int8_t getRssiFar() const { return _rssiFar; }
+    
     // Lap counting
     void update();  // Call in loop for lap detection
     uint32_t getLapCount(uint8_t teamId) const;
@@ -77,10 +89,14 @@ public:
 private:
     BeaconService* _beaconService;
     PersistenceService* _persistence;
+    DataLoggerService* _dataLogger;
     std::map<uint8_t, TeamData> _teams;
     uint8_t _nextTeamId;
     bool _raceActive;
     uint32_t _raceStartTime;
+    uint32_t _minLapTime;
+    int8_t _rssiNear;
+    int8_t _rssiFar;
     
     // Lap detection state
     std::map<String, bool> _beaconPresence;  // Track presence per beacon
