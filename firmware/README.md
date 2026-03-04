@@ -21,13 +21,16 @@ ultralight_v3/
 ```
 
 **Features:**
-- LVGL8 UI System (modern, responsive)
-- NimBLE BLE Scanning (optimiert für Race Mode)
+- LVGL8 UI System (modern, responsive, 10 Screens)
+- NimBLE BLE Passive Scanning (optimiert für Race Mode)
 - Service-basierte Architektur
-- SD Card CSV Logging
+- SD Card CSV Logging mit Race History & per-Team Lap Detail
 - Team Management mit Persistence (NVS)
-- Automatische Rundenzählung
-- Live Leaderboard
+- Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far)
+- Konfigurierbare RSSI-Schwellwerte & Min Lap Time (via UI)
+- Live Leaderboard (Timer/Board Toggle)
+- Debug Screen (Live RSSI, Near/Far Status farbcodiert)
+- Race Results: 3-Ebenen (Rennliste → Leaderboard → Team-Rundenzeiten)
 
 **BLE Backend Optionen:**
 - NimBLE-Arduino (Standard, beste Performance)
@@ -126,14 +129,15 @@ Alle Settings in `src/ultralight_v3/core/config.h`:
 #define SCREEN_HEIGHT 240
 
 // BLE Scanner
-#define BLE_SCAN_INTERVAL 100
-#define BLE_SCAN_WINDOW   99
+#define BLE_SCAN_INTERVAL 50     // ms (passive scan)
+#define BLE_SCAN_WINDOW   49     // ms
 #define BLE_RSSI_THRESHOLD -100
 #define BLE_UUID_PREFIX "c3:00:"
 
-// Lap Detection
-#define DEFAULT_LAP_RSSI_NEAR -65
-#define DEFAULT_LAP_RSSI_FAR  -80
+// Lap Detection (configurable via Settings UI)
+#define DEFAULT_LAP_RSSI_NEAR -65  // Raw RSSI >= this → "present"
+#define DEFAULT_LAP_RSSI_FAR  -80  // Avg RSSI <= this → "absent"
+#define MIN_LAP_TIME 10000         // ms, debounce (1-120s via UI)
 ```
 
 ### BLE Backend Selection

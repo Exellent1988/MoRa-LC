@@ -196,12 +196,16 @@ npm install
 ✅ Team-Login & Detailauswertung  
 ✅ GPS/UWB erweiterbar  
 
-### UltraLight
-✅ Rundenzählung & Zeiten  
-✅ Touch-UI auf Display  
-✅ Team-Management  
-✅ SD-Karte Logging
+### UltraLight v3
+✅ Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far)  
+✅ Touch-UI auf Display (LVGL8, 10 Screens)  
+✅ Team-Management (NVS-Persistenz)  
+✅ SD-Karte Logging (CSV pro Rennen)  
+✅ Race History (3 Ebenen: Rennliste → Leaderboard → Team-Laps)  
 ✅ RSSI-basierte Beacon-Zuordnung  
+✅ Konfigurierbare Settings (Min Lap Time, RSSI Near/Far)  
+✅ Debug Screen (Live RSSI, Near/Far/Mid farbcodiert)  
+✅ BLE Passive Scan (50ms Interval, schnelle Erkennung)  
 ❌ Keine Karte/Live-Position  
 ❌ Keine IMU-Sensoren  
 ❌ Keine Cloud-Features  
@@ -238,16 +242,19 @@ Bei Fragen oder Problemen: [Issue erstellen](../../issues)
 
 **Aktueller Fortschritt:**
 - [x] Projekt-Setup & Planung
-- [x] **UltraLight v3** - ✅ **Bereit für Hardware-Test!**
+- [x] **UltraLight v3** - **Hardware-getestet!**
   - [x] Clean Architecture (Services, Hardware-Abstraction, LVGL8 UI)
-  - [x] On-Screen Keyboard für Team-Namen
-  - [x] Persistenz – Teams überleben Reboots (NVS)
-  - [x] Vollständige Touch-UI (9 Screens, Navigation, Dialoge)
-  - [x] BLE Scanning (NimBLE) & RSSI-basierte Rundenzählung
-  - [x] Auto-Stop wenn Rennzeit endet → automatisch zu Ergebnissen
-  - [x] SD-Karte Logging (CSV Export)
-  - [x] Bugfixes: BLE-Callback, Navigation, Delete-Dialog (März 2026)
-- [ ] **Hardware Field-Test** – nächster Schritt!
+  - [x] 10 Screens: Home, Teams, TeamEdit, BeaconAssign, RaceSetup, RaceRunning, RaceResults, Settings, Debug, BLETest
+  - [x] Overlay On-Screen Keyboard für Team-Namen & Rennnamen
+  - [x] Persistenz – Teams, RSSI-Settings, Min Lap Time (NVS)
+  - [x] BLE Passive Scan (NimBLE, 50ms, 3-Sample RSSI)
+  - [x] Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far)
+  - [x] Konfigurierbare Settings via +/- Modal-Dialog
+  - [x] Race History: 3-Ebenen CSV-basiert (Rennliste → Leaderboard → Team-Laps)
+  - [x] Debug Screen: Live RSSI, Near/Far/Mid farbcodiert
+  - [x] Auto-Stop, Timer/Board Toggle, Rennname in CSV
+  - [x] SD-Karte CSV Logging mit Rundenzeiten, RSSI, Time-of-Day
+  - [x] Hardware-Test: Touch, Display, BLE, SD, Rundenzählung verifiziert
 - [ ] FullBlown Basis-System
 - [ ] Abschluss-Features
 

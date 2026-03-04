@@ -1,131 +1,141 @@
 # MoRa-LC - Implementierungs-Status
 
-**Letztes Update:** Code-Review & Bugfixes abgeschlossen (ultralight_v3)
-**Version:** 3.0.1
+**Letztes Update:** Hardware-Test & Optimierungen abgeschlossen (ultralight_v3)
+**Version:** 3.1.0
 
-## ✅ UltraLight v3 - Fertig & Bugfixed
+## UltraLight v3 - Hardware-getestet & optimiert
 
-### Code-Review Ergebnisse (März 2026)
+### Hardware-Test Ergebnisse (März 2026)
 
-Im Rahmen eines vollständigen Code-Reviews wurden folgende Bugs gefunden und behoben:
+Erfolgreich auf CheapYellow Display (ESP32-2432S028) mit Xiaomi Mi Beacons getestet.
+Mehrere Rennen mit 3 Teams simuliert, Rundenzählung und CSV-Logging verifiziert.
 
-**Behobene Bugs:**
-1. **KRITISCH: BLE Callback-Überschreibung** – `main.cpp` (Normal Mode) überschrieb den LapCounter-internen BLE-Callback mit einem Debug-Print → Rundenzählung hat nie funktioniert. **Behoben.**
-2. **KRITISCH: Doppelte Navigation beim Race-Stop** – `stopBtnEventHandler` rief `stopRace()` (navigiert zu Results) UND danach noch `goBack()` auf → sofortige Weiternavigation weg von Results. **Behoben.**
-3. **Rennen Auto-Stop fehlte** – Race Running Screen hat die Restzeit zwar angezeigt, aber nie automatisch gestoppt wenn 0:00 erreicht. **Behoben (Auto-Stop + Weiterleitung zu Results).**
-4. **Teams-Screen Delete ohne Bestätigung** – Langer Druck auf ein Team hat es sofort gelöscht ohne Dialog. **Behoben (DialogManager Confirm-Dialog).**
-5. **SdFat/SD.h Konflikt** – `data_logger_service.cpp` inkludierte sowohl `<SdFat.h>` als auch `<SD.h>`. **Behoben.**
-6. **BLE Scan startet nicht ohne Rennen** – Im Normal Mode wurde der Scan nie gestartet (kein `startScanning()` nach `beaconService.begin()`). **Behoben.**
+### Behobene Bugs & Verbesserungen
+
+**Kritische Fixes:**
+1. **Touch-Input funktionierte nicht** – SPI-Konflikt zwischen Display und Touch. Touch auf Software-SPI (Bit-Banging) umgestellt, Display auf HSPI. **Behoben.**
+2. **BLE-Scan blockierend** – `NimBLEScan::start()` mit 2 Parametern blockiert. Auf non-blocking 3-Parameter-Variante umgestellt. **Behoben.**
+3. **Race Results zeigt 0 Runden** – `stopRace()` → `setScreen(results)` → `onExit()` → `stopRace()` → infinite Recursion → ESP32 Crash → Reboot → RAM-Daten verloren. **Behoben: `onExit()` bereinigt nur State, navigiert nicht.**
+4. **SD-Karte leer** – SPI-Bus-Konflikt Display/SD-Karte. Display auf HSPI, SD auf VSPI. **Behoben.**
+5. **Erster Lap sofort bei Rennstart gezählt** – `_beaconPresence` nicht vorgeladen. Fix: Alle Beacons bei `startRace()` als "present" vorinitialisiert. **Behoben.**
+6. **Alle Teams zeigen gleiche MAC** – String-Truncation bei MAC-Anzeige. Fix: Nur letzte 5 Zeichen anzeigen. **Behoben.**
+
+**UI/UX Verbesserungen:**
+- Keyboard-Gap zwischen Eingabefeld und Tastatur geschlossen (`LV_ALIGN_TOP_LEFT`)
+- Race Running Screen: Zwei-View-System (Timer / Leaderboard) mit Toggle-Button
+- Settings: Min Lap Time, RSSI Near/Far über Modal-Dialog mit +/- Buttons einstellbar
+- Race Setup: Rennname-Eingabe, +15min Button, Overlay-Keyboard
+- Race Results: 3-Ebenen-Navigation (Rennliste → Rennergebnis → Team-Rundenzeiten)
+- Debug Screen: Live-Ansicht aller Beacons mit Raw/Avg RSSI und Near/Far/Mid Status (farbcodiert)
+- BLE Settings Dialog: Lesbare Größe, alle Parameter sichtbar
+
+**Performance-Optimierungen:**
+- BLE Scan: Passive Scan (weniger Latenz), Interval 50ms/Window 49ms
+- RSSI History: 5 → 3 Samples (schnellere Reaktion)
+- Near-Detection: Raw RSSI statt Average (sofortige Erkennung bei Vorbeifahrt)
+- Far-Detection: Average RSSI (stabiler, keine Fehlauslösung)
+- Hysteresis-Logik: Near/Far Schwellwerte verhindern Flapping
 
 ### Feature-Stand
 
-- ✅ **Clean Architecture** – Modulare Service-basierte Architektur
-- ✅ **Core System** – SystemManager, TaskManager, MemoryManager
-- ✅ **Hardware Abstraction** – Display/LVGL, Touch, SD Card, BLE
-- ✅ **Services:**
-  - `BeaconService` – BLE Scanning mit NimBLE, RSSI-Mittelwert, Race-Mode
-  - `LapCounterService` – Automatische Rundenzählung (RSSI Near/Far), Team-Management, Persistence-Integration
-  - `PersistenceService` – NVS-basierte Datenspeicherung (Teams bleiben nach Reboot erhalten)
-  - `DataLoggerService` – SD Card CSV Logging mit Timestamp, Auto-Flush, Datei-Management
-- ✅ **UI System (LVGL 8):**
+- **Clean Architecture** – Modulare Service-basierte Architektur
+- **Core System** – SystemManager, TaskManager, MemoryManager
+- **Hardware Abstraction** – Display/LVGL, Touch (Software-SPI), SD Card, BLE
+- **Services:**
+  - `BeaconService` – BLE Scanning mit NimBLE, 3-Sample RSSI-Mittelwert, Race-Mode
+  - `LapCounterService` – Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far), Team-Management, Persistence
+  - `PersistenceService` – NVS-basierte Datenspeicherung (Teams, RSSI-Settings, Min Lap Time)
+  - `DataLoggerService` – SD Card CSV Logging mit Race-History, Datei-Listing, CSV-Parsing
+- **UI System (LVGL 8):**
   - Home Screen (Hauptmenü)
   - Teams Screen (Liste, Hinzufügen, Löschen mit Bestätigung)
-  - Team Edit Screen (On-Screen Keyboard)
-  - Beacon Assign Screen (RSSI-basierte Auswahl)
-  - Race Setup Screen (Dauer 5–120 Min)
-  - Race Running Screen (Timer, Restzeit, Live-Leaderboard, Auto-Stop)
-  - Race Results Screen (Rangliste mit Rundenzeiten)
-  - Settings Screen (Teams speichern, BLE-Info, Reset)
-  - BLE Test Screen (Debug-Ansicht)
-- ✅ **Navigation** – Vollständiges Stack-basiertes Navigation-System
-- ✅ **BLE Integration** – NimBLE (Standard), Duplicate Filter disabled, MAC-Filter
-- ✅ **SD Card Logging** – CSV mit Header, periodisches Flush
-- ✅ **Persistenz** – Teams & RSSI-Settings in NVS
-- ✅ **Kompilierung** – Fehlerfrei, keine Warnings
-  - RAM: 31.3% (102 KB / 327 KB)
-  - Flash: 75.5% (989 KB / 1310 KB)
+  - Team Edit Screen (Overlay On-Screen Keyboard)
+  - Beacon Assign Screen (RSSI-basierte Auswahl, letzte 5 MAC-Zeichen)
+  - Race Setup Screen (Dauer 5–180 Min, Rennname-Eingabe, Overlay-Keyboard)
+  - Race Running Screen (Timer/Leaderboard Toggle, Elapsed/Remaining, Auto-Stop)
+  - Race Results Screen (3-Ebenen: Rennliste → Leaderboard → Team-Laps aus CSV)
+  - Settings Screen (Min Lap Time, RSSI Near/Far via +/- Dialog, Debug, BLE Info, Reset)
+  - Debug Screen (Live Beacon RSSI, Near/Far/Mid farbcodiert, Lap Count)
+- **Navigation** – Stack-basiert, Back-Button auf allen Screens
+- **BLE Integration** – NimBLE, Passive Scan, Duplicate Filter disabled, MAC-Filter
+- **SD Card Logging** – CSV pro Rennen mit Rennname, Rundenzeiten, RSSI, Time-of-Day
+- **Race History** – CSV-Dateien von SD lesen, per Rennen und Team abrufbar
+- **Persistenz** – Teams, RSSI Near/Far, Min Lap Time in NVS
 
-### UI-Flow Review
+### UI-Flow
 
 | Flow | Status | Anmerkungen |
 |------|--------|-------------|
-| Home → Race Setup → Race Running → Race Results | ✅ | Auto-Stop, korrektes Navigations-Verhalten |
-| Home → Teams → Add Team → Edit Name → Back | ✅ | On-Screen Keyboard, Validierung |
-| Home → Teams → Team → Assign Beacon | ✅ | BLE Scan, RSSI-Auswahl |
-| Home → Teams → Long Press → Delete Confirm | ✅ | DialogManager Confirm |
-| Home → Results (letzte Ergebnisse) | ✅ | Zeigt Leaderboard aus LapCounter |
-| Home → Settings → Save Teams | ✅ | NVS via PersistenceService |
-| Home → Settings → BLE Settings | ✅ | Info-Dialog mit Parametern |
-| Home → Settings → Reset | ✅ | Confirm-Dialog, löscht NVS |
-| Race Running → Pause/Resume | ✅ | Timer pausiert korrekt |
-| Race Running → Auto-Stop bei Zeit=0 | ✅ | Navigiert automatisch zu Results |
+| Home → Race Setup → Race Running → Stop → Results → Home | OK | Kein Recursion-Bug mehr |
+| Home → Results → Rennen wählen → Team wählen → Rundenzeiten | OK | 3-Ebenen CSV-basiert |
+| Home → Teams → Add → Keyboard → Back | OK | Overlay-Keyboard |
+| Home → Teams → Team → Assign Beacon | OK | RSSI-Sortierung, Short-Click |
+| Home → Teams → Long Press → Delete Confirm | OK | DialogManager |
+| Home → Settings → Min Lap Time / RSSI → +/- Dialog | OK | Persistiert in NVS |
+| Home → Settings → Debug → Live RSSI | OK | Farbcodiert Near/Far/Mid |
+| Race Running → Timer/Board Toggle | OK | Große Uhr vs. Leaderboard |
+| Race Running → Auto-Stop bei Zeit=0 | OK | → Results |
 
 ### BLE Scan-Parameter
 
 | Parameter | Wert | Anmerkung |
 |-----------|------|-----------|
-| Library | NimBLE-Arduino | Beste Duplicate-Handling |
-| Scan Interval | 100 ms | |
-| Scan Window | 99 ms | Fast-continuous |
-| Duplicate Filter | false | Nötig für RSSI-Updates im Race Mode |
-| RSSI Threshold | -100 dBm | Kein Filter (alles wird gezählt) |
+| Library | NimBLE-Arduino | Passive Scan |
+| Scan Interval | 50 ms | |
+| Scan Window | 49 ms | Fast-continuous |
+| Scan Mode | Passiv | Weniger Latenz als Active |
+| Duplicate Filter | false | Nötig für RSSI-Updates |
+| RSSI Threshold | -100 dBm | Filter in BLE Layer |
 | MAC Filter | `c3:00:` | Xiaomi Mi Beacon Prefix |
-| Lap RSSI Near | -65 dBm | Beacon "da" (vorbeigefahren) |
-| Lap RSSI Far | -80 dBm | Beacon "weg" |
-| Min Lap Time | 10.000 ms | Anti-Bounce |
+| RSSI History | 3 Samples | Circular Buffer |
 
-### Farb-Kontraste (WCAG-Prüfung)
+### Lap Detection Parameter (konfigurierbar via UI)
 
-| Paar | Verhältnis | WCAG AA |
-|------|-----------|---------|
-| TEXT auf BACKGROUND | 12.9:1 | ✅ PASS |
-| TEXT auf SURFACE | 21.0:1 | ✅ PASS |
-| HEADER_TEXT auf HEADER_BG | 8.6:1 | ✅ PASS |
-| BUTTON_TEXT auf BUTTON | 5.4:1 | ✅ PASS |
-| BUTTON_TEXT auf SECONDARY | 15.3:1 | ✅ PASS |
-| BUTTON_TEXT auf DANGER | 5.3:1 | ✅ PASS |
+| Parameter | Default | Range | Anmerkung |
+|-----------|---------|-------|-----------|
+| RSSI Near | -65 dBm | -30 bis -90 | Raw RSSI >= Near → "present" (fast trigger) |
+| RSSI Far | -80 dBm | -40 bis -100 | Avg RSSI <= Far → "absent" (smooth) |
+| Min Lap Time | 10 s | 1–120 s | Debounce gegen Doppelzählung |
+
+### Build-Status
+
+- RAM: 31.5% (103 KB / 327 KB)
+- Flash: 84.3% (1104 KB / 1310 KB)
+- Kompilierung: 0 Errors, 0 Warnings
 
 ---
 
-## 🚧 Ausstehend
+## Ausstehend
 
-### UltraLight v3 – Noch offen (nach Field-Test entscheiden)
+### UltraLight v3 – Optional (nach Field-Test)
 
-- [ ] **Hardware-Test** – Noch kein echter Test auf Hardware durchgeführt
-- [ ] **Touch-Kalibrierung** – Eventuell nötig (Kalibrierungsdaten in `config.h` vorhanden)
-- [ ] **RSSI-Kalibrierung** – Lap-Detection Schwellwerte hängen von Umgebung ab
-- [ ] **Icon System** – Aktuell LVGL Built-in Symbole (LV_SYMBOL_*), keine eigenen Bitmaps
-- [ ] **Scroll in langen Team-Listen** – LVGL List scrollt, aber bei >8 Teams evtl. träge
-- [ ] **Beacon-MAC-Zuordnung robuster machen** – Aktuell: Extraktion aus Label-Text (fragil)
+- [ ] **RSSI-Kalibrierung** – Schwellwerte je nach Strecke/Umgebung anpassen
+- [ ] **Wokwi Simulator** – Für UI-Entwicklung ohne Hardware
+- [ ] **Race Running: Größere Uhr** – Font-Limitierung bei Flash-Größe
+- [ ] **Current Race in Results** – Auch ohne CSV (nur aus RAM) Rundenzeiten anzeigen
+- [ ] **Active Scan Fallback** – Falls Passive Scan iBeacon-Daten nicht liefert
 
 ### FullBlown System (noch nicht begonnen)
 
 **Firmware (0%):**
-- ❌ Beacon-Firmware (ESP32 + LoRa + BLE + IMU)
-- ❌ Gateway-Firmware (LoRa RX + MQTT + BLE RSSI)
-- ❌ Display-Firmware (WS2812 + LoRa)
+- Beacon-Firmware (ESP32 + LoRa + BLE + IMU)
+- Gateway-Firmware (LoRa RX + MQTT + BLE RSSI)
+- Display-Firmware (WS2812 + LoRa)
 
 **Backend (0%):**
-- ❌ FastAPI Setup
-- ❌ MQTT Client & Handler
-- ❌ SQLite Datenbank
-- ❌ Position Tracker (RSSI Trilateration)
-- ❌ Services (Lap Counter, Crash Detector)
+- FastAPI Setup, MQTT Client, SQLite, Position Tracker
 
 **Frontend (0%):**
-- ❌ React + Vite Setup
-- ❌ Admin Dashboard
-- ❌ Live-View (Leaflet Karte)
-- ❌ WebSocket Integration
+- React + Vite, Admin Dashboard, Live-View (Leaflet), WebSocket
 
 ---
 
-## 📊 Gesamt-Fortschritt
+## Gesamt-Fortschritt
 
 | Komponente | Fortschritt | Status |
 |------------|------------|--------|
-| UltraLight v3 Firmware | 95% | Bereit für Hardware-Test |
-| LoRa Protokoll | 100% | Definiert & dokumentiert |
+| UltraLight v3 Firmware | 98% | Hardware-getestet |
+| LoRa Protokoll | 100% | Definiert |
 | FullBlown Firmware | 0% | Nicht begonnen |
 | FullBlown Backend | 0% | Nicht begonnen |
 | FullBlown Frontend | 0% | Nicht begonnen |
@@ -133,71 +143,16 @@ Im Rahmen eines vollständigen Code-Reviews wurden folgende Bugs gefunden und be
 
 ---
 
-## 🎯 Nächste Schritte
-
-### Priorität 1: UltraLight Field-Test
-
-**Hardware besorgen:**
-- 1x CheapYellow Display (ESP32-2432S028) – ~15€
-- 3–5x Xiaomi Mi Beacon – ~9–15€
-- 1x MicroSD-Karte (FAT32, ≤32GB) – ~5€
-- 1x USB Powerbank (≥5000mAh) – ~15€
-
-**Firmware flashen:**
-```bash
-cd firmware
-pio run -e ultralight_v3 -t upload
-# Oder mit Monitor:
-pio run -e ultralight_v3 -t upload && pio device monitor
-```
-
-**Test-Szenario:**
-1. 3 Teams anlegen (On-Screen Keyboard)
-2. Beacons per RSSI zuordnen (Beacon nah an Display halten)
-3. Kurzes Testrennen starten (5 Min)
-4. Kontrollieren: Rundenzählung korrekt? SD-Log vorhanden?
-5. Ergebnisse ansehen
-
-**Zu prüfen:**
-- Touch-Responsivität (ggf. Kalibrierung anpassen)
-- BLE-Scan-Reichweite (funktioniert Lap-Detection bei realer Vorbeifahrt?)
-- RSSI-Schwellwerte (Anpassung in `config.h`: `DEFAULT_LAP_RSSI_NEAR` / `DEFAULT_LAP_RSSI_FAR`)
-- SD-Logging (Datei `/races/race_<timestamp>.csv` auf SD-Karte?)
-
-### Priorität 2: FullBlown Basis (nach erfolgreichem Field-Test)
-
-1. Beacon-Firmware (LoRa + BLE + IMU)
-2. Gateway-Firmware (LoRa RX + MQTT Bridge)
-3. Python Backend Basis (FastAPI + MQTT + DB)
-4. Frontend Setup (React + Basic UI)
-
----
-
-## 🐛 Bekannte Einschränkungen
+## Bekannte Einschränkungen
 
 | Problem | Schwere | Workaround |
 |---------|---------|------------|
-| Kein Hardware-Test | Hoch | Bald testen |
-| Beacon-MAC aus Label-Text (fragil) | Mittel | Funktioniert solange Format gleich bleibt |
 | Kein RTC – Timestamps relativ zu millis() | Niedrig | Für Renndauer ausreichend |
-| Max. 20 Teams (konfigurierbar in `config.h`) | Niedrig | Für meisten Anwendungsfälle genug |
-| Fonts: Umlaute in Standard-ASCII-Font nicht sicher | Niedrig | Alle Labels auf ASCII geändert |
+| Max. 20 Teams (konfigurierbar) | Niedrig | Für meisten Rennen genug |
+| Fonts: Keine Umlaute | Niedrig | Labels auf ASCII |
+| Flash bei 84% | Mittel | Keine weiteren großen Fonts aktivieren |
+| Passive Scan: iBeacon-Daten evtl. nur in Scan Response | Niedrig | Fallback auf Active Scan möglich |
 
 ---
 
-## 📁 Datei-Statistik (ultralight_v3)
-
-| Kategorie | Dateien | Zeilen |
-|-----------|---------|--------|
-| Core (config, system) | 6 | ~300 |
-| Hardware (display, BLE, SD, touch) | 10 | ~600 |
-| Services (beacon, lap, logger, persist) | 8 | ~800 |
-| UI Screens (LVGL) | 18 | ~1400 |
-| UI Widgets (dialog, button, icons) | 6 | ~400 |
-| **Gesamt** | **~48** | **~3500** |
-
-**Build-Status:** ✅ `ultralight_v3` kompiliert fehlerfrei (0 Errors, 0 Warnings)
-
----
-
-*Nächstes Update nach Hardware-Test*
+*Nächstes Update nach Feld-Einsatz bei echtem Rennen*
