@@ -19,13 +19,14 @@ void LVGLDialog::show(const char* title, const char* message,
                      lv_event_cb_t callback, void* user_data) {
     hide(); // Remove existing dialog
     
-    // Create modal background
-    _obj = lv_obj_create(_parent);
+    // Create modal background on lv_layer_top (works on any screen)
+    _obj = lv_obj_create(lv_layer_top());
     lv_obj_set_size(_obj, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_set_pos(_obj, 0, 0);
     lv_obj_set_style_bg_color(_obj, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(_obj, LV_OPA_50, 0);
     lv_obj_set_style_border_width(_obj, 0, 0);
+    lv_obj_clear_flag(_obj, LV_OBJ_FLAG_SCROLLABLE);
     
     // Create dialog box
     lv_obj_t* dialogBox = lv_obj_create(_obj);
@@ -75,12 +76,13 @@ void LVGLDialog::showConfirm(const char* title, const char* message,
                              void* user_data) {
     hide();
     
-    // Create modal background
-    _obj = lv_obj_create(_parent);
+    // Create modal background on lv_layer_top (works on any screen)
+    _obj = lv_obj_create(lv_layer_top());
     lv_obj_set_size(_obj, SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_obj_set_pos(_obj, 0, 0);
     lv_obj_set_style_bg_color(_obj, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(_obj, LV_OPA_50, 0);
+    lv_obj_clear_flag(_obj, LV_OBJ_FLAG_SCROLLABLE);
     
     // Create dialog box
     lv_obj_t* dialogBox = lv_obj_create(_obj);

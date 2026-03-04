@@ -84,6 +84,7 @@ static const uint16_t* TOUCH_CAL_DATA = nullptr;
 
 // Debug/Test Modes
 // #define BLE_TEST_MODE  // Uncomment to start with BLE Test Screen
+// #define COLOR_TEST_MODE   // Shows color test at boot (remove after calibration)
 
 // UI Spacing (8px grid system)
 #define GRID_UNIT 8

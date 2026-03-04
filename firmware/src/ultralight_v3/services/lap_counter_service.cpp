@@ -5,6 +5,7 @@
 
 LapCounterService::LapCounterService()
     : _beaconService(nullptr)
+    , _persistence(nullptr)
     , _nextTeamId(1)
     , _raceActive(false)
     , _raceStartTime(0) {
@@ -52,6 +53,7 @@ bool LapCounterService::addTeam(const String& name) {
     _teams[team.teamId] = team;
     
     Serial.printf("[LapCounter] Team added: ID=%u, Name=%s\n", team.teamId, name.c_str());
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -63,6 +65,7 @@ bool LapCounterService::removeTeam(uint8_t teamId) {
     
     _teams.erase(it);
     Serial.printf("[LapCounter] Team removed: ID=%u\n", teamId);
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -74,9 +77,7 @@ bool LapCounterService::updateTeam(uint8_t teamId, const String& name) {
     
     it->second.teamName = name;
     Serial.printf("[LapCounter] Team updated: ID=%u, Name=%s\n", teamId, name.c_str());
-    
-    // Auto-save teams (optional)
-    
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -88,6 +89,7 @@ bool LapCounterService::assignBeacon(uint8_t teamId, const String& beaconUUID) {
     
     it->second.beaconUUID = beaconUUID;
     Serial.printf("[LapCounter] Beacon assigned: Team=%u, Beacon=%s\n", teamId, beaconUUID.c_str());
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 

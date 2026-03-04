@@ -44,6 +44,7 @@ public:
     void end();
     
     // Persistence
+    void setPersistenceService(PersistenceService* persistence) { _persistence = persistence; }
     bool saveTeams(PersistenceService* persistence);
     bool loadTeams(PersistenceService* persistence);
     
@@ -75,6 +76,7 @@ public:
     
 private:
     BeaconService* _beaconService;
+    PersistenceService* _persistence;
     std::map<uint8_t, TeamData> _teams;
     uint8_t _nextTeamId;
     bool _raceActive;

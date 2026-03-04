@@ -65,11 +65,11 @@ public:
             cfg.x_max = 3700;
             cfg.y_min = 200;
             cfg.y_max = 3800;
-            cfg.pin_int = TOUCH_IRQ_PIN;       // 36 (optional)
+            cfg.pin_int = -1;                  // Disabled: GPIO36 unreliable when BLE active (ESP32 errata)
             cfg.bus_shared = false;            // Touch has separate SPI bus
             cfg.offset_rotation = 0;
             cfg.spi_host = HSPI_HOST;          // Use HSPI for Touch (separate from Display)
-            cfg.freq = 2500000;                 // 2.5 MHz
+            cfg.freq = 2500000;                // 2.5 MHz
             cfg.pin_sclk = TOUCH_CLK_PIN;      // 25
             cfg.pin_mosi = TOUCH_MOSI_PIN;     // 32
             cfg.pin_miso = TOUCH_MISO_PIN;     // 39

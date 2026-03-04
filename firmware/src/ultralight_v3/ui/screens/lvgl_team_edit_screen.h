@@ -34,13 +34,10 @@ private:
     
     lv_obj_t* _nameTextArea;
     lv_obj_t* _keyboard;
-    lv_obj_t* _saveButton;
-    lv_obj_t* _cancelButton;
     
     // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
-    static void saveBtnEventHandler(lv_event_t* e);
-    static void cancelBtnEventHandler(lv_event_t* e);
+    static void keyboardEventHandler(lv_event_t* e);
 };
 
 #endif // LVGL_TEAM_EDIT_SCREEN_H

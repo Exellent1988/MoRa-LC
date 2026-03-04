@@ -10,7 +10,8 @@ LVGLBeaconAssignScreen::LVGLBeaconAssignScreen(LVGLDisplay* lvglDisplay, BeaconS
     , _teamId(0)
     , _instructionLabel(nullptr)
     , _beaconList(nullptr)
-    , _lastUpdate(0) {
+    , _lastUpdate(0)
+    , _macCount(0) {
 }
 
 LVGLBeaconAssignScreen::~LVGLBeaconAssignScreen() {
@@ -92,16 +93,21 @@ void LVGLBeaconAssignScreen::updateBeaconList() {
         return;
     }
     
-    // Add beacons to list
+    _macCount = 0;
     for (const auto& beacon : beacons) {
+        if (_macCount >= MAX_STORED_MACS) break;
+        
+        strncpy(_macStorage[_macCount], beacon.macAddress.c_str(), 17);
+        _macStorage[_macCount][17] = '\0';
+        
         char info[128];
         snprintf(info, sizeof(info), "%s\nRSSI: %d dBm", beacon.macAddress.c_str(), beacon.avgRssi);
         
         lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, info);
         lv_obj_add_event_cb(item, beaconItemEventHandler, LV_EVENT_CLICKED, this);
+        lv_obj_set_user_data(item, _macStorage[_macCount]);
         
-        // Store beacon UUID in user data (we'll use a simple string copy)
-        // For now, use the label text to identify the beacon
+        _macCount++;
     }
 }
 
@@ -117,19 +123,10 @@ void LVGLBeaconAssignScreen::beaconItemEventHandler(lv_event_t* e) {
     LVGLBeaconAssignScreen* screen = (LVGLBeaconAssignScreen*)lv_event_get_user_data(e);
     if (!screen || !screen->_lapCounter) return;
     
-    // Get beacon UUID from list item (we'll use the label text)
     lv_obj_t* item = lv_event_get_target(e);
-    lv_obj_t* label = lv_obj_get_child(item, 1); // Second child is usually the label
-    if (label) {
-        const char* text = lv_label_get_text(label);
-        // Extract MAC address from text (first line before \n)
-        String macAddress = String(text);
-        int newlinePos = macAddress.indexOf('\n');
-        if (newlinePos > 0) {
-            macAddress = macAddress.substring(0, newlinePos);
-        }
-        
-        screen->assignBeaconToTeam(macAddress);
+    const char* mac = (const char*)lv_obj_get_user_data(item);
+    if (mac) {
+        screen->assignBeaconToTeam(String(mac));
     }
 }
 

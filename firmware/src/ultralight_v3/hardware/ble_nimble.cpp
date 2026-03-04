@@ -136,7 +136,8 @@ bool BLENimBLE::startScan(uint32_t durationMs) {
     _scanning = true;
     
     uint32_t scanDuration = (durationMs == 0) ? 0 : (durationMs / 1000);
-    _pBLEScan->start(scanDuration, false);  // false = non-blocking, don't restart
+    // 3-param overload is NON-BLOCKING (2-param is blocking!)
+    _pBLEScan->start(scanDuration, nullptr, false);
     
     // Disable logging again after start
     delay(10);

@@ -38,6 +38,10 @@ private:
     lv_obj_t* _beaconList;
     uint32_t _lastUpdate;
     
+    static constexpr int MAX_STORED_MACS = 20;
+    char _macStorage[MAX_STORED_MACS][18];
+    int _macCount;
+    
     // Event handlers
     static void backBtnEventHandler(lv_event_t* e);
     static void beaconItemEventHandler(lv_event_t* e);

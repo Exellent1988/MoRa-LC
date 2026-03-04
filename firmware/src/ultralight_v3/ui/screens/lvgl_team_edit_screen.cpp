@@ -8,9 +8,7 @@ LVGLTeamEditScreen::LVGLTeamEditScreen(LVGLDisplay* lvglDisplay, LapCounterServi
     , _lapCounter(lapCounter)
     , _teamId(0)
     , _nameTextArea(nullptr)
-    , _keyboard(nullptr)
-    , _saveButton(nullptr)
-    , _cancelButton(nullptr) {
+    , _keyboard(nullptr) {
 }
 
 LVGLTeamEditScreen::~LVGLTeamEditScreen() {
@@ -41,15 +39,16 @@ void LVGLTeamEditScreen::onEnter() {
     createHeader(_teamId == 0 ? "New Team" : "Edit Team", true, backBtnEventHandler, this);
     
     // Name label
-    int y = HEADER_HEIGHT + Spacing::MD;
-    createLabel("Team Name:", Spacing::MD, y, 150, 25, rgb565ToLVGL(Colors::TEXT));
-    y += 30;
+    int y = HEADER_HEIGHT + Spacing::SM;
+    createLabel("Team Name:", Spacing::MD, y, 150, 20, rgb565ToLVGL(Colors::TEXT));
+    y += 24;
     
     // Text area for team name
     _nameTextArea = lv_textarea_create(_screen);
-    lv_obj_set_size(_nameTextArea, SCREEN_WIDTH - 2 * Spacing::MD, 40);
+    lv_obj_set_size(_nameTextArea, SCREEN_WIDTH - 2 * Spacing::MD, 35);
     lv_obj_set_pos(_nameTextArea, Spacing::MD, y);
     lv_textarea_set_placeholder_text(_nameTextArea, "Enter team name");
+    lv_textarea_set_one_line(_nameTextArea, true);
     lv_obj_set_style_bg_color(_nameTextArea, rgb565ToLVGL(Colors::SURFACE), 0);
     lv_obj_set_style_text_color(_nameTextArea, rgb565ToLVGL(Colors::TEXT), 0);
     lv_obj_set_style_border_width(_nameTextArea, 1, 0);
@@ -63,27 +62,17 @@ void LVGLTeamEditScreen::onEnter() {
         }
     }
     
-    y += 60;
+    y += 39;
     
-    // Create keyboard for text input
+    // Keyboard fills remaining space (uses built-in OK/Cancel keys)
     _keyboard = lv_keyboard_create(_screen);
     lv_keyboard_set_textarea(_keyboard, _nameTextArea);
     lv_keyboard_set_mode(_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
-    lv_obj_set_size(_keyboard, SCREEN_WIDTH, SCREEN_HEIGHT - y - BUTTON_HEIGHT - Spacing::MD);
+    lv_obj_set_size(_keyboard, SCREEN_WIDTH, SCREEN_HEIGHT - y);
     lv_obj_set_pos(_keyboard, 0, y);
     lv_obj_set_style_bg_color(_keyboard, rgb565ToLVGL(Colors::BACKGROUND), 0);
-    
-    // Adjust button positions to be above keyboard
-    y = SCREEN_HEIGHT - BUTTON_HEIGHT - Spacing::MD;
-    
-    // Buttons
-    int btnW = (SCREEN_WIDTH - 3 * Spacing::MD) / 2;
-    int btnH = BUTTON_HEIGHT;
-    
-    _saveButton = createButton("Save", Spacing::MD, y, btnW, btnH, saveBtnEventHandler, this);
-    lv_obj_set_style_bg_color(_saveButton, rgb565ToLVGL(Colors::SECONDARY), 0);
-    
-    _cancelButton = createButton("Cancel", Spacing::MD * 2 + btnW, y, btnW, btnH, cancelBtnEventHandler, this);
+    lv_obj_add_event_cb(_keyboard, keyboardEventHandler, LV_EVENT_READY, this);
+    lv_obj_add_event_cb(_keyboard, keyboardEventHandler, LV_EVENT_CANCEL, this);
     
     Serial.println("[LVGLTeamEdit] Team edit screen created");
 }
@@ -109,54 +98,36 @@ void LVGLTeamEditScreen::backBtnEventHandler(lv_event_t* e) {
     }
 }
 
-void LVGLTeamEditScreen::saveBtnEventHandler(lv_event_t* e) {
+void LVGLTeamEditScreen::keyboardEventHandler(lv_event_t* e) {
     LVGLTeamEditScreen* screen = (LVGLTeamEditScreen*)lv_event_get_user_data(e);
-    if (!screen || !screen->_lapCounter || !screen->_nameTextArea) {
-        Serial.println("[LVGLTeamEdit] ERROR: Cannot save - missing dependencies");
-        return;
-    }
+    if (!screen) return;
     
-    const char* name = lv_textarea_get_text(screen->_nameTextArea);
-    if (!name || strlen(name) == 0) {
-        Serial.println("[LVGLTeamEdit] ERROR: Team name is empty");
-        return;
-    }
+    lv_event_code_t code = lv_event_get_code(e);
     
-    if (screen->_teamId == 0) {
-        // New team
-        if (screen->_lapCounter->addTeam(String(name))) {
-            Serial.printf("[LVGLTeamEdit] Team added: %s\n", name);
-            // Teams are saved automatically or manually via Settings
-            if (screen->_navigation) {
-                screen->_navigation->goBack();
+    if (code == LV_EVENT_READY) {
+        // OK key pressed - save
+        if (!screen->_lapCounter || !screen->_nameTextArea) return;
+        
+        const char* name = lv_textarea_get_text(screen->_nameTextArea);
+        if (!name || strlen(name) == 0) {
+            Serial.println("[LVGLTeamEdit] Team name is empty");
+            return;
+        }
+        
+        if (screen->_teamId == 0) {
+            if (screen->_lapCounter->addTeam(String(name))) {
+                Serial.printf("[LVGLTeamEdit] Team added: %s\n", name);
+                if (screen->_navigation) screen->_navigation->goBack();
             }
         } else {
-            Serial.println("[LVGLTeamEdit] ERROR: Failed to add team");
-        }
-    } else {
-        // Update existing team
-        if (screen->_lapCounter->updateTeam(screen->_teamId, String(name))) {
-            Serial.printf("[LVGLTeamEdit] Team updated: ID=%u, Name=%s\n", screen->_teamId, name);
-            // Teams are saved automatically or manually via Settings
-            if (screen->_navigation) {
-                screen->_navigation->goBack();
+            if (screen->_lapCounter->updateTeam(screen->_teamId, String(name))) {
+                Serial.printf("[LVGLTeamEdit] Team updated: ID=%u, Name=%s\n", screen->_teamId, name);
+                if (screen->_navigation) screen->_navigation->goBack();
             }
-        } else {
-            Serial.println("[LVGLTeamEdit] ERROR: Failed to update team");
         }
-    }
-}
-
-void LVGLTeamEditScreen::cancelBtnEventHandler(lv_event_t* e) {
-    LVGLTeamEditScreen* screen = (LVGLTeamEditScreen*)lv_event_get_user_data(e);
-    if (screen) {
-        // Hide keyboard before navigating back
-        if (screen->_keyboard) {
-            lv_obj_add_flag(screen->_keyboard, LV_OBJ_FLAG_HIDDEN);
-        }
-        if (screen->_navigation) {
-            Serial.println("[LVGLTeamEdit] Cancel button clicked");
-            screen->_navigation->goBack();
-        }
+    } else if (code == LV_EVENT_CANCEL) {
+        // Cancel key pressed
+        Serial.println("[LVGLTeamEdit] Cancel pressed");
+        if (screen->_navigation) screen->_navigation->goBack();
     }
 }
