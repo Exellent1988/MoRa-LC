@@ -1,4 +1,31 @@
-<!-- 95dae5ad-3d52-499d-b711-2b589bb58c08 a2a601ae-696d-4ee1-82ed-0320f33b9e2f -->
+---
+name: Fix ultralight_v3 Critical Issues
+overview: ""
+todos:
+  - id: 3f321473-b388-4a59-872f-231825974714
+    content: Dialog show() Aufrufe in lvgl_settings_screen.cpp korrigieren (7 Zeilen)
+    status: pending
+  - id: ed7a4b5f-daf0-48bd-a66e-cfcf2ded8324
+    content: Dialog delete im Settings Screen Destruktor hinzufügen
+    status: pending
+  - id: 5dba2592-8281-4693-844a-093bf0b68db6
+    content: Navigation Stack mit Duplikat-Check und Limit versehen
+    status: pending
+  - id: 164dfd1d-e563-4318-ba0a-2549a9cb9e2a
+    content: Dialog-Manager Singleton implementieren (Header + Implementation)
+    status: pending
+  - id: 5f0bab5a-25fa-4de8-88a4-c55089cac794
+    content: Dialog-Manager in Settings Screen und main.cpp integrieren
+    status: pending
+  - id: 375d27d6-0a07-4a4e-8c44-57bf6e0a0ff3
+    content: config.h Include in lvgl_settings_screen.cpp hinzufügen
+    status: pending
+  - id: 9ac4adc8-78dc-411e-95f9-b3d4cad8366c
+    content: Kompiliertest durchführen und Fehler prüfen
+    status: pending
+isProject: false
+---
+
 # Fix ultralight_v3 Critical Issues
 
 ## Übersicht
@@ -99,13 +126,3 @@ fix(ultralight_v3): kritische UI Fehler behoben
 - Globaler Dialog-Manager als Singleton implementiert
 - Fehlende config.h Include hinzugefügt
 ```
-
-### To-dos
-
-- [ ] Dialog show() Aufrufe in lvgl_settings_screen.cpp korrigieren (7 Zeilen)
-- [ ] Dialog delete im Settings Screen Destruktor hinzufügen
-- [ ] Navigation Stack mit Duplikat-Check und Limit versehen
-- [ ] Dialog-Manager Singleton implementieren (Header + Implementation)
-- [ ] Dialog-Manager in Settings Screen und main.cpp integrieren
-- [ ] config.h Include in lvgl_settings_screen.cpp hinzufügen
-- [ ] Kompiliertest durchführen und Fehler prüfen
