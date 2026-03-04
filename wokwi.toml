@@ -1,0 +1,11 @@
+# Wokwi Simulation - MoRa-LC UltraLight v3
+# diagram.json und wokwi.toml MÜSSEN im Workspace-Root liegen (Wokwi-Einschränkung)
+#
+# Usage:
+#   1. Build: cd firmware && pio run -e ultralight_v3
+#   2. F1 -> "Wokwi: Start Simulator"
+
+[wokwi]
+version = 1
+elf = "firmware/.pio/build/ultralight_v3/firmware.elf"
+firmware = "firmware/.pio/build/ultralight_v3/firmware.bin"

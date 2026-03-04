@@ -123,6 +123,9 @@ lv_obj_t* LVGLBaseScreen::createList(int x, int y, int w, int h) {
     lv_obj_set_size(list, w, h);
     lv_obj_set_pos(list, x, y);
     lv_obj_set_style_bg_color(list, rgb565ToLVGL(Colors::BACKGROUND), 0);
+    lv_obj_set_style_pad_all(list, 0, 0);
+    lv_obj_set_style_pad_row(list, 1, 0);
+    lv_obj_set_style_border_width(list, 0, 0);
     
     return list;
 }

@@ -6,6 +6,9 @@
 #include <lvgl.h>
 #include <vector>
 
+// Maximum navigation stack depth to prevent overflow
+#define MAX_NAVIGATION_STACK_DEPTH 10
+
 /**
  * Navigation System for LVGL8 Screens
  * Manages screen transitions and navigation stack

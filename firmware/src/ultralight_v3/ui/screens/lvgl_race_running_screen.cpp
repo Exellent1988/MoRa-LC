@@ -1,5 +1,6 @@
 #include "lvgl_race_running_screen.h"
 #include "../navigation_lvgl.h"
+#include "../../services/data_logger_service.h"
 #include <Arduino.h>
 
 LVGLRaceRunningScreen::LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconService* beaconService, LapCounterService* lapCounter)
@@ -8,11 +9,19 @@ LVGLRaceRunningScreen::LVGLRaceRunningScreen(LVGLDisplay* lvglDisplay, BeaconSer
     , _beaconService(beaconService)
     , _lapCounter(lapCounter)
     , _raceResultsScreen(nullptr)
+    , _dataLogger(nullptr)
+    , _showBoard(false)
+    , _timeViewContainer(nullptr)
+    , _bigTimeLabel(nullptr)
+    , _bigRemainingLabel(nullptr)
+    , _boardViewContainer(nullptr)
+    , _smallTimeLabel(nullptr)
+    , _leaderboardList(nullptr)
     , _timeLabel(nullptr)
     , _remainingLabel(nullptr)
-    , _leaderboardList(nullptr)
     , _pauseButton(nullptr)
     , _stopButton(nullptr)
+    , _viewButton(nullptr)
     , _raceStartTime(0)
     , _raceDuration(0)
     , _isRunning(false)
@@ -33,64 +42,108 @@ void LVGLRaceRunningScreen::onEnter() {
     }
     
     Serial.println("[LVGLRaceRunning] Creating race running screen...");
-    Serial.printf("[LVGLRaceRunning] Display: %p, BeaconService: %p, LapCounter: %p\n",
-                  _lvglDisplay, _beaconService, _lapCounter);
     
-    // Get current screen
     _screen = _lvglDisplay->getScreen();
-    if (!_screen) {
-        Serial.println("[LVGLRaceRunning] ERROR: Could not get screen");
-        return;
-    }
+    if (!_screen) return;
     
-    // Clear screen and reset UI elements
     lv_obj_clean(_screen);
-    _timeLabel = nullptr;
-    _remainingLabel = nullptr;
+    _timeViewContainer = nullptr;
+    _boardViewContainer = nullptr;
+    _bigTimeLabel = nullptr;
+    _bigRemainingLabel = nullptr;
+    _smallTimeLabel = nullptr;
     _leaderboardList = nullptr;
     _pauseButton = nullptr;
     _stopButton = nullptr;
+    _viewButton = nullptr;
     
-    // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header (no back button during race, ASCII only)
-    createHeader("Race Running", false);
+    createHeader("Race", false);
     
-    // Time display (large, centered)
-    int timeY = HEADER_HEIGHT + Spacing::MD;
-    _timeLabel = createLabel("00:00:00", 0, timeY, SCREEN_WIDTH, 50, rgb565ToLVGL(Colors::TEXT));
-    if (_timeLabel) {
-        lv_obj_set_style_text_align(_timeLabel, LV_TEXT_ALIGN_CENTER, 0);
-    }
+    // Layout: Header(35) | Content(171) | Buttons(34)
+    int contentY = HEADER_HEIGHT;
+    int btnH = 34;
+    int btnY = SCREEN_HEIGHT - btnH;
+    int contentH = btnY - contentY;
     
-    // Remaining time (ASCII only)
-    int remainingY = timeY + 60;
-    _remainingLabel = createLabel("Remaining: 00:00", 0, remainingY, SCREEN_WIDTH, 30, rgb565ToLVGL(Colors::TEXT_SECONDARY));
-    if (_remainingLabel) {
-        lv_obj_set_style_text_align(_remainingLabel, LV_TEXT_ALIGN_CENTER, 0);
-    }
+    // ===== TIME VIEW (default) =====
+    _timeViewContainer = lv_obj_create(_screen);
+    lv_obj_set_size(_timeViewContainer, SCREEN_WIDTH, contentH);
+    lv_obj_set_pos(_timeViewContainer, 0, contentY);
+    lv_obj_set_style_bg_opa(_timeViewContainer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(_timeViewContainer, 0, 0);
+    lv_obj_set_style_pad_all(_timeViewContainer, 0, 0);
+    lv_obj_clear_flag(_timeViewContainer, LV_OBJ_FLAG_SCROLLABLE);
     
-    // Leaderboard list
-    int listY = remainingY + 40;
-    int listH = SCREEN_HEIGHT - listY - BUTTON_HEIGHT - Spacing::MD;
-    _leaderboardList = createList(Spacing::MD, listY, SCREEN_WIDTH - 2 * Spacing::MD, listH);
+    // Big elapsed time - centered, largest font
+    _bigTimeLabel = lv_label_create(_timeViewContainer);
+    lv_label_set_text(_bigTimeLabel, "00:00");
+    lv_obj_set_style_text_color(_bigTimeLabel, rgb565ToLVGL(Colors::TEXT), 0);
+    extern const lv_font_t lv_font_montserrat_36;
+    lv_obj_set_style_text_font(_bigTimeLabel, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_align(_bigTimeLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(_bigTimeLabel, SCREEN_WIDTH);
+    lv_obj_align(_bigTimeLabel, LV_ALIGN_CENTER, 0, -25);
     
-    // Control buttons (bottom)
-    int btnY = SCREEN_HEIGHT - BUTTON_HEIGHT - Spacing::MD;
-    int btnW = (SCREEN_WIDTH - 3 * Spacing::MD) / 2;
+    // Remaining time below in bold-sized font
+    _bigRemainingLabel = lv_label_create(_timeViewContainer);
+    lv_label_set_text(_bigRemainingLabel, "-00:00");
+    lv_obj_set_style_text_color(_bigRemainingLabel, rgb565ToLVGL(Colors::TEXT_SECONDARY), 0);
+    extern const lv_font_t lv_font_montserrat_28;
+    lv_obj_set_style_text_font(_bigRemainingLabel, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_align(_bigRemainingLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(_bigRemainingLabel, SCREEN_WIDTH);
+    lv_obj_align(_bigRemainingLabel, LV_ALIGN_CENTER, 0, 25);
     
-    _pauseButton = createButton("Pause", Spacing::MD, btnY, btnW, BUTTON_HEIGHT, pauseBtnEventHandler, this);
-    _stopButton = createButton("Stop", Spacing::MD * 2 + btnW, btnY, btnW, BUTTON_HEIGHT, stopBtnEventHandler, this);
+    // ===== BOARD VIEW (hidden initially) =====
+    _boardViewContainer = lv_obj_create(_screen);
+    lv_obj_set_size(_boardViewContainer, SCREEN_WIDTH, contentH);
+    lv_obj_set_pos(_boardViewContainer, 0, contentY);
+    lv_obj_set_style_bg_opa(_boardViewContainer, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(_boardViewContainer, 0, 0);
+    lv_obj_set_style_pad_all(_boardViewContainer, 0, 0);
+    lv_obj_clear_flag(_boardViewContainer, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(_boardViewContainer, LV_OBJ_FLAG_HIDDEN);
+    
+    // Time bar at top of board view
+    _smallTimeLabel = lv_label_create(_boardViewContainer);
+    lv_label_set_text(_smallTimeLabel, "00:00  -00:00");
+    lv_obj_set_style_text_color(_smallTimeLabel, rgb565ToLVGL(Colors::TEXT), 0);
+    lv_obj_set_style_text_font(_smallTimeLabel, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_align(_smallTimeLabel, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(_smallTimeLabel, SCREEN_WIDTH);
+    lv_obj_set_pos(_smallTimeLabel, 0, 2);
+    
+    // Leaderboard list below the time bar
+    int listY = 24;
+    int listH = contentH - listY;
+    _leaderboardList = lv_list_create(_boardViewContainer);
+    lv_obj_set_size(_leaderboardList, SCREEN_WIDTH, listH);
+    lv_obj_set_pos(_leaderboardList, 0, listY);
+    lv_obj_set_style_bg_color(_leaderboardList, rgb565ToLVGL(Colors::BACKGROUND), 0);
+    lv_obj_set_style_pad_all(_leaderboardList, 0, 0);
+    lv_obj_set_style_pad_row(_leaderboardList, 1, 0);
+    lv_obj_set_style_border_width(_leaderboardList, 0, 0);
+    
+    // ===== BUTTONS (always visible) =====
+    int btnW = (SCREEN_WIDTH - 4 * Spacing::SM) / 3;
+    
+    _pauseButton = createButton("Pause", Spacing::SM, btnY, btnW, btnH, pauseBtnEventHandler, this);
+    _stopButton = createButton("Stop", 2 * Spacing::SM + btnW, btnY, btnW, btnH, stopBtnEventHandler, this);
     if (_stopButton) {
         lv_obj_set_style_bg_color(_stopButton, rgb565ToLVGL(Colors::DANGER), 0);
     }
+    _viewButton = createButton("Board", 3 * Spacing::SM + 2 * btnW, btnY, btnW, btnH, viewBtnEventHandler, this);
+    if (_viewButton) {
+        lv_obj_set_style_bg_color(_viewButton, rgb565ToLVGL(Colors::INFO), 0);
+    }
     
+    _showBoard = false;
     _lastUpdate = millis();
     _lastDisplayedTime = 0;
     _lastDisplayedRemaining = 0;
     
-    // Update leaderboard if race is already running
     if (_isRunning && _leaderboardList) {
         updateLeaderboard();
     }
@@ -99,49 +152,92 @@ void LVGLRaceRunningScreen::onEnter() {
 }
 
 void LVGLRaceRunningScreen::onExit() {
-    stopRace();
+    // Clean up race state without navigating (prevents infinite recursion)
+    if (_isRunning) {
+        _isRunning = false;
+        _isPaused = false;
+        if (_beaconService) {
+            _beaconService->setRaceMode(false);
+        }
+        if (_lapCounter) _lapCounter->stopRace();
+        if (_dataLogger) _dataLogger->logRaceEnd();
+    }
+}
+
+void LVGLRaceRunningScreen::switchView() {
+    _showBoard = !_showBoard;
+    
+    if (_showBoard) {
+        lv_obj_add_flag(_timeViewContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(_boardViewContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(lv_obj_get_child(_viewButton, 0), "Time");
+        updateLeaderboard();
+    } else {
+        lv_obj_clear_flag(_timeViewContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(_boardViewContainer, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(lv_obj_get_child(_viewButton, 0), "Board");
+    }
+    
+    // Force refresh of both time displays
+    _lastDisplayedTime = 0;
+    _lastDisplayedRemaining = 0;
 }
 
 void LVGLRaceRunningScreen::update() {
-    if (!_isRunning || !_timeLabel || !_remainingLabel) return;
+    if (!_isRunning) return;
     
-    // Performance: Only update display every 100ms (10fps for time display is enough)
+    uint32_t remaining = getRemainingTime();
+    if (remaining == 0 && !_isPaused) {
+        Serial.println("[LVGLRaceRunning] Race time finished - auto stopping");
+        stopRace();
+        return;
+    }
+    
     uint32_t now = millis();
     if (now - _lastUpdate < 100) return;
     _lastUpdate = now;
     
     uint32_t elapsed = getElapsedTime();
-    uint32_t remaining = getRemainingTime();
     
-    // Only update if values changed (performance optimization)
     if (elapsed != _lastDisplayedTime) {
         String timeStr = formatTime(elapsed);
-        lv_label_set_text(_timeLabel, timeStr.c_str());
+        
+        if (_bigTimeLabel)
+            lv_label_set_text(_bigTimeLabel, timeStr.c_str());
+        
+        if (_smallTimeLabel && _showBoard) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%s  -%s", timeStr.c_str(), formatTime(remaining).c_str());
+            lv_label_set_text(_smallTimeLabel, buf);
+        }
+        
         _lastDisplayedTime = elapsed;
     }
     
     if (remaining != _lastDisplayedRemaining) {
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Remaining: %s", formatTime(remaining).c_str());
-        lv_label_set_text(_remainingLabel, buf);
+        if (_bigRemainingLabel) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "-%s", formatTime(remaining).c_str());
+            lv_label_set_text(_bigRemainingLabel, buf);
+        }
         _lastDisplayedRemaining = remaining;
     }
     
-    // Update leaderboard less frequently (every 500ms)
-    static uint32_t lastLeaderboardUpdate = 0;
-    if (now - lastLeaderboardUpdate > 500) {
-        updateLeaderboard();
-        lastLeaderboardUpdate = now;
+    // Update leaderboard less frequently
+    if (_showBoard) {
+        static uint32_t lastLeaderboardUpdate = 0;
+        if (now - lastLeaderboardUpdate > 500) {
+            updateLeaderboard();
+            lastLeaderboardUpdate = now;
+        }
     }
 }
 
-void LVGLRaceRunningScreen::startRace(uint32_t durationMinutes) {
+void LVGLRaceRunningScreen::startRace(uint32_t durationMinutes, const char* raceName) {
     Serial.printf("[LVGLRaceRunning] startRace called - Duration: %lu minutes\n", durationMinutes);
-    Serial.printf("[LVGLRaceRunning] BeaconService: %p, LapCounter: %p\n", _beaconService, _lapCounter);
     
-    // Set race state FIRST (before enabling services)
     _raceStartTime = millis();
-    _raceDuration = durationMinutes * 60 * 1000;  // Convert to milliseconds
+    _raceDuration = durationMinutes * 60 * 1000;
     _isRunning = true;
     _isPaused = false;
     _pausedTime = 0;
@@ -149,38 +245,35 @@ void LVGLRaceRunningScreen::startRace(uint32_t durationMinutes) {
     _lastDisplayedTime = 0;
     _lastDisplayedRemaining = 0;
     
-    // Enable race mode in beacon service
     if (_beaconService) {
-        Serial.println("[LVGLRaceRunning] Enabling race mode in beacon service...");
         _beaconService->setRaceMode(true);
         _beaconService->startScanning(0);
-        Serial.println("[LVGLRaceRunning] Beacon service race mode enabled");
-    } else {
-        Serial.println("[LVGLRaceRunning] WARNING: BeaconService is null!");
     }
     
-    // Start race in lap counter
     if (_lapCounter) {
-        Serial.println("[LVGLRaceRunning] Starting race in lap counter...");
         _lapCounter->startRace();
-        Serial.println("[LVGLRaceRunning] Lap counter race started");
-    } else {
-        Serial.println("[LVGLRaceRunning] WARNING: LapCounter is null!");
     }
     
-    Serial.printf("[LVGLRaceRunning] Race started successfully - Duration: %lu minutes\n", durationMinutes);
+    if (_dataLogger) {
+        String name;
+        if (raceName && strlen(raceName) > 0) {
+            name = String(raceName);
+            name.replace(" ", "_");
+        }
+        _dataLogger->logRaceStart(name);
+    }
+    
+    Serial.printf("[LVGLRaceRunning] Race started - Duration: %lu minutes\n", durationMinutes);
 }
 
 void LVGLRaceRunningScreen::pauseRace() {
     if (!_isRunning) return;
     
     if (_isPaused) {
-        // Resume
         _raceStartTime += (millis() - _pausedTime);
         _isPaused = false;
         Serial.println("[LVGLRaceRunning] Race resumed");
     } else {
-        // Pause
         _pausedTime = millis();
         _isPaused = true;
         Serial.println("[LVGLRaceRunning] Race paused");
@@ -188,74 +281,51 @@ void LVGLRaceRunningScreen::pauseRace() {
 }
 
 void LVGLRaceRunningScreen::stopRace() {
-    _isRunning = false;
-    _isPaused = false;
-    
-    // Disable race mode in beacon service
-    if (_beaconService) {
-        _beaconService->setRaceMode(false);
-        _beaconService->stopScanning();
-    }
-    
-    // Stop race in lap counter
-    if (_lapCounter) {
-        _lapCounter->stopRace();
-    }
-    
-    Serial.println("[LVGLRaceRunning] Race stopped");
-    
-    // Navigate to results screen
+    // onExit() handles cleanup; this just navigates to results
+    Serial.println("[LVGLRaceRunning] Race stopped - navigating to results");
     if (_navigation && _raceResultsScreen) {
-        Serial.println("[LVGLRaceRunning] Navigating to results screen");
         _navigation->setScreen((LVGLBaseScreen*)_raceResultsScreen);
     }
-}
-
-void LVGLRaceRunningScreen::updateTimeDisplay() {
-    if (!_timeLabel || !_remainingLabel) return;
-    
-    uint32_t elapsed = getElapsedTime();
-    uint32_t remaining = getRemainingTime();
-    
-    String timeStr = formatTime(elapsed);
-    lv_label_set_text(_timeLabel, timeStr.c_str());
-    
-    char buf[64];
-    snprintf(buf, sizeof(buf), "Verbleibend: %s", formatTime(remaining).c_str());
-    lv_label_set_text(_remainingLabel, buf);
 }
 
 void LVGLRaceRunningScreen::updateLeaderboard() {
     if (!_leaderboardList) return;
     
-    // Clear existing list items
     lv_obj_clean(_leaderboardList);
     
     if (!_lapCounter) {
-        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "LapCounter not available");
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        lv_list_add_btn(_leaderboardList, NULL, "No LapCounter");
         return;
     }
     
     std::vector<TeamData*> leaderboard = _lapCounter->getLeaderboard();
     
     if (leaderboard.empty()) {
-        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, "No teams");
-        lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        lv_list_add_btn(_leaderboardList, NULL, "No teams");
         return;
     }
     
-    // Add teams to leaderboard (max 4 visible)
     int count = 0;
     for (TeamData* team : leaderboard) {
-        if (count >= 4) break; // Max 4 teams visible
+        if (count >= 10) break;
         
         char info[128];
-        snprintf(info, sizeof(info), "%u. %s\nLaps: %u", 
-                count + 1, team->teamName.c_str(), team->lapCount);
+        if (team->lapCount > 0 && team->bestLapTime > 0) {
+            snprintf(info, sizeof(info), "%u. %s  %u laps  best:%lus", 
+                    count + 1, team->teamName.c_str(), team->lapCount,
+                    team->bestLapTime / 1000);
+        } else {
+            snprintf(info, sizeof(info), "%u. %s  %u laps", 
+                    count + 1, team->teamName.c_str(), team->lapCount);
+        }
         
-        lv_obj_t* item = lv_list_add_btn(_leaderboardList, LV_SYMBOL_FILE, info);
+        lv_obj_t* item = lv_list_add_btn(_leaderboardList, NULL, info);
         lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        lv_obj_set_style_pad_ver(item, 1, 0);
+        lv_obj_set_style_pad_hor(item, 4, 0);
+        lv_obj_set_height(item, 22);
+        lv_obj_set_style_min_height(item, 22, 0);
+        lv_obj_set_style_max_height(item, 22, 0);
         
         count++;
     }
@@ -263,21 +333,14 @@ void LVGLRaceRunningScreen::updateLeaderboard() {
 
 uint32_t LVGLRaceRunningScreen::getElapsedTime() const {
     if (!_isRunning) return 0;
-    
-    if (_isPaused) {
-        return _pausedTime - _raceStartTime;
-    } else {
-        return millis() - _raceStartTime;
-    }
+    if (_isPaused) return _pausedTime - _raceStartTime;
+    return millis() - _raceStartTime;
 }
 
 uint32_t LVGLRaceRunningScreen::getRemainingTime() const {
     if (!_isRunning) return 0;
-    
     uint32_t elapsed = getElapsedTime();
-    if (elapsed >= _raceDuration) {
-        return 0;  // Race finished
-    }
+    if (elapsed >= _raceDuration) return 0;
     return _raceDuration - elapsed;
 }
 
@@ -289,18 +352,16 @@ String LVGLRaceRunningScreen::formatTime(uint32_t milliseconds) const {
     
     char buf[16];
     if (hours > 0) {
-        snprintf(buf, sizeof(buf), "%02lu:%02lu:%02lu", hours, minutes, seconds);
+        snprintf(buf, sizeof(buf), "%lu:%02lu:%02lu", hours, minutes, seconds);
     } else {
         snprintf(buf, sizeof(buf), "%02lu:%02lu", minutes, seconds);
     }
-    
     return String(buf);
 }
 
 void LVGLRaceRunningScreen::backBtnEventHandler(lv_event_t* e) {
     LVGLRaceRunningScreen* screen = (LVGLRaceRunningScreen*)lv_event_get_user_data(e);
     if (screen && screen->_navigation) {
-        Serial.println("[LVGLRaceRunning] Back button clicked");
         screen->_navigation->goBack();
     }
 }
@@ -309,22 +370,23 @@ void LVGLRaceRunningScreen::pauseBtnEventHandler(lv_event_t* e) {
     LVGLRaceRunningScreen* screen = (LVGLRaceRunningScreen*)lv_event_get_user_data(e);
     if (screen) {
         screen->pauseRace();
-        // Update button label
-        if (screen->_isPaused) {
-            lv_label_set_text(lv_obj_get_child(screen->_pauseButton, 0), "Weiter");
-        } else {
-            lv_label_set_text(lv_obj_get_child(screen->_pauseButton, 0), "Pause");
+        if (screen->_pauseButton) {
+            lv_label_set_text(lv_obj_get_child(screen->_pauseButton, 0),
+                            screen->_isPaused ? "Resume" : "Pause");
         }
     }
 }
 
 void LVGLRaceRunningScreen::stopBtnEventHandler(lv_event_t* e) {
     LVGLRaceRunningScreen* screen = (LVGLRaceRunningScreen*)lv_event_get_user_data(e);
-    if (screen && screen->_navigation) {
-        Serial.println("[LVGLRaceRunning] Stop button clicked");
+    if (screen) {
         screen->stopRace();
-        // TODO: Navigate to results screen
-        screen->_navigation->goBack();
     }
 }
 
+void LVGLRaceRunningScreen::viewBtnEventHandler(lv_event_t* e) {
+    LVGLRaceRunningScreen* screen = (LVGLRaceRunningScreen*)lv_event_get_user_data(e);
+    if (screen) {
+        screen->switchView();
+    }
+}

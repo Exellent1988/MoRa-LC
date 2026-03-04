@@ -1,13 +1,19 @@
 #include "lap_counter_service.h"
 #include "persistence_service.h"
+#include "data_logger_service.h"
 #include <algorithm>
 #include <ArduinoJson.h>
 
 LapCounterService::LapCounterService()
     : _beaconService(nullptr)
+    , _persistence(nullptr)
+    , _dataLogger(nullptr)
     , _nextTeamId(1)
     , _raceActive(false)
-    , _raceStartTime(0) {
+    , _raceStartTime(0)
+    , _minLapTime(MIN_LAP_TIME)
+    , _rssiNear(DEFAULT_LAP_RSSI_NEAR)
+    , _rssiFar(DEFAULT_LAP_RSSI_FAR) {
 }
 
 LapCounterService::~LapCounterService() {
@@ -52,6 +58,7 @@ bool LapCounterService::addTeam(const String& name) {
     _teams[team.teamId] = team;
     
     Serial.printf("[LapCounter] Team added: ID=%u, Name=%s\n", team.teamId, name.c_str());
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -63,6 +70,7 @@ bool LapCounterService::removeTeam(uint8_t teamId) {
     
     _teams.erase(it);
     Serial.printf("[LapCounter] Team removed: ID=%u\n", teamId);
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -74,9 +82,7 @@ bool LapCounterService::updateTeam(uint8_t teamId, const String& name) {
     
     it->second.teamName = name;
     Serial.printf("[LapCounter] Team updated: ID=%u, Name=%s\n", teamId, name.c_str());
-    
-    // Auto-save teams (optional)
-    
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -88,6 +94,7 @@ bool LapCounterService::assignBeacon(uint8_t teamId, const String& beaconUUID) {
     
     it->second.beaconUUID = beaconUUID;
     Serial.printf("[LapCounter] Beacon assigned: Team=%u, Beacon=%s\n", teamId, beaconUUID.c_str());
+    if (_persistence) saveTeams(_persistence);
     return true;
 }
 
@@ -122,7 +129,17 @@ void LapCounterService::startRace() {
     _beaconPresence.clear();
     _lastLapTime.clear();
     
-    Serial.println("[LapCounter] Race started");
+    // Pre-seed: mark all assigned beacons as "present" and set their last lap
+    // time to now so the first detection doesn't immediately count as a lap
+    uint32_t now = millis();
+    for (auto& pair : _teams) {
+        if (pair.second.beaconUUID.length() > 0) {
+            _beaconPresence[pair.second.beaconUUID] = true;
+            _lastLapTime[pair.second.beaconUUID] = now;
+        }
+    }
+    
+    Serial.printf("[LapCounter] Race started (minLapTime=%lus)\n", _minLapTime / 1000);
 }
 
 void LapCounterService::stopRace() {
@@ -264,6 +281,12 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
                 
                 _lastLapTime[beacon.macAddress] = now;
                 
+                // Log to SD card
+                if (_dataLogger) {
+                    _dataLogger->logLap(pair.second.teamId, pair.second.teamName, 
+                                       pair.second.lapCount, beacon.avgRssi);
+                }
+                
                 // Notify callback
                 if (_lapCallback) {
                     _lapCallback(pair.second.teamId, pair.second.lapCount);
@@ -278,19 +301,26 @@ void LapCounterService::handleBeaconUpdate(const BeaconInfo& beacon) {
 }
 
 bool LapCounterService::detectLap(const String& beaconUUID, const BeaconInfo& beacon) {
-    // Simple lap detection: beacon crosses threshold (near -> far -> near)
+    // Hysteresis with fast-trigger:
+    // NEAR: use RAW rssi (single strong reading triggers immediately)
+    // FAR:  use avgRssi (smoothed, prevents false "absent" from one weak reading)
     bool wasPresent = _beaconPresence[beaconUUID];
-    bool isPresent = beacon.avgRssi >= DEFAULT_LAP_RSSI_NEAR;
+    bool isPresent = wasPresent;
+    
+    if (beacon.rssi >= _rssiNear) {
+        isPresent = true;
+    } else if (beacon.avgRssi <= _rssiFar) {
+        isPresent = false;
+    }
     
     _beaconPresence[beaconUUID] = isPresent;
     
-    // Detect crossing: was far, now near (and enough time passed)
     if (!wasPresent && isPresent) {
         uint32_t now = millis();
         auto lastTimeIt = _lastLapTime.find(beaconUUID);
         
         if (lastTimeIt == _lastLapTime.end() || 
-            (now - lastTimeIt->second) >= MIN_LAP_TIME) {
+            (now - lastTimeIt->second) >= _minLapTime) {
             return true;
         }
     }

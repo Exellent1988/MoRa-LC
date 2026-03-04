@@ -34,6 +34,8 @@
 #include "ui/screens/lvgl_beacon_assign_screen.h"
 #include "ui/screens/lvgl_team_edit_screen.h"
 #include "ui/screens/lvgl_test_screen.h"
+#include "ui/screens/lvgl_debug_screen.h"
+#include "ui/widgets/dialog_manager.h"
 #endif
 
 // Global instances
@@ -67,6 +69,7 @@ LVGLRaceResultsScreen lvglRaceResultsScreen(&lvglDisplay, &lapCounterService);
 LVGLSettingsScreen lvglSettingsScreen(&lvglDisplay, &persistenceService, &dataLoggerService, &lapCounterService);
 LVGLBeaconAssignScreen lvglBeaconAssignScreen(&lvglDisplay, &beaconService, &lapCounterService);
 LVGLTeamEditScreen lvglTeamEditScreen(&lvglDisplay, &lapCounterService);
+LVGLDebugScreen lvglDebugScreen(&lvglDisplay, &beaconService, &lapCounterService);
 #endif
 
 // ============================================================
@@ -155,6 +158,10 @@ void setup() {
     lvglNavigation.begin(&lvglDisplay);
     Serial.println("[Main] LVGL Navigation initialized");
     
+    // 4b. Initialize Dialog Manager with root screen
+    DialogManager::getInstance()->begin(lvglDisplay.getScreen());
+    Serial.println("[Main] Dialog Manager initialized");
+    
     // 5. Set up screen navigation
     lvglHomeScreen.setNavigation(&lvglNavigation);
     lvglHomeScreen.setTeamsScreen(&lvglTeamsScreen);
@@ -173,7 +180,90 @@ void setup() {
     lvglRaceRunningScreen.setNavigation(&lvglNavigation);
     lvglRaceRunningScreen.setRaceResultsScreen(&lvglRaceResultsScreen);
     lvglRaceResultsScreen.setNavigation(&lvglNavigation);
+    lvglRaceResultsScreen.setHomeScreen(&lvglHomeScreen);
+    lvglRaceResultsScreen.setDataLogger(&dataLoggerService);
     lvglSettingsScreen.setNavigation(&lvglNavigation);
+    lvglSettingsScreen.setDebugScreen(&lvglDebugScreen);
+    lvglDebugScreen.setNavigation(&lvglNavigation);
+    
+    // Color test via LVGL (same rendering path as actual UI)
+    #ifdef COLOR_TEST_MODE
+    {
+        Serial.println("[Main] LVGL COLOR TEST - creating test screen");
+        lv_obj_t* testScr = lv_obj_create(NULL);
+        lv_obj_set_style_bg_color(testScr, lv_color_black(), 0);
+        lv_scr_load(testScr);
+        
+        struct { uint16_t val; const char* label; } colors[] = {
+            // Row 1: light gray candidates (for BACKGROUND)
+            {0xCE59, "CE59"},  // current (blue tint)
+            {0xCE4C, "CE4C"},  // less blue (B=12)
+            {0xCE40, "CE40"},  // no blue
+            {0xC618, "C618"},  // balanced darker
+            {0xE71C, "E71C"},  // lighter balanced
+            // Row 2: medium gray candidates (for BUTTON)
+            {0x8410, "8410"},  // current (blue tint)
+            {0x8408, "8408"},  // less blue (B=8)
+            {0x8400, "8400"},  // no blue
+            {0x630C, "630C"},  // current PRESSED
+            {0x6300, "6300"},  // PRESSED no blue
+        };
+        const int count = 10;
+        const int cols = 5;
+        const int rows = 2;
+        int bw = SCREEN_WIDTH / cols;
+        int bh = SCREEN_HEIGHT / rows;
+        
+        for (int i = 0; i < count; i++) {
+            int col = i % cols;
+            int row = i / cols;
+            
+            lv_obj_t* block = lv_obj_create(testScr);
+            lv_obj_set_pos(block, col * bw, row * bh);
+            lv_obj_set_size(block, bw, bh);
+            lv_obj_set_style_radius(block, 0, 0);
+            lv_obj_set_style_border_width(block, 1, 0);
+            lv_obj_set_style_border_color(block, lv_color_white(), 0);
+            lv_obj_set_style_pad_all(block, 0, 0);
+            
+            lv_color_t c;
+            c.full = colors[i].val;
+            lv_obj_set_style_bg_color(block, c, 0);
+            lv_obj_set_style_bg_opa(block, LV_OPA_COVER, 0);
+            
+            lv_obj_t* lbl = lv_label_create(block);
+            lv_label_set_text(lbl, colors[i].label);
+            lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
+            lv_obj_center(lbl);
+            
+            // Shadow label in black for contrast
+            lv_obj_t* lbl2 = lv_label_create(block);
+            lv_label_set_text(lbl2, colors[i].label);
+            lv_obj_set_style_text_color(lbl2, lv_color_black(), 0);
+            lv_obj_set_pos(lbl2, 2, 2);
+        }
+        
+        Serial.println("[Main] GRAY TEST displayed via LVGL.");
+        Serial.println("  Row 1: Light grays (BACKGROUND candidates): CE59 CE4C CE40 C618 E71C");
+        Serial.println("  Row 2: Medium grays (BUTTON candidates):    8410 8408 8400 630C 6300");
+        Serial.println("  Touch to continue (or wait 15s)...");
+        
+        // Run LVGL to render the test screen
+        uint32_t start = millis();
+        while (millis() - start < 15000) {
+            lvglDisplay.update();
+            uint16_t tx, ty;
+            if (display.getTouch(&tx, &ty)) {
+                delay(300); // debounce
+                break;
+            }
+            delay(5);
+        }
+        
+        lv_obj_del(testScr);
+        Serial.println("[Main] Color test done, proceeding to home screen");
+    }
+    #endif
     
     // 6. Show initial screen
     #ifdef BLE_TEST_MODE
@@ -183,6 +273,13 @@ void setup() {
     Serial.println("[Main] Starting with Home Screen");
     lvglNavigation.setScreen(&lvglHomeScreen);
     #endif
+    
+    // Force initial LVGL render (ensures first frame is flushed to display)
+    lv_obj_invalidate(lv_scr_act());
+    for (int i = 0; i < 5; i++) {
+        lvglDisplay.update();
+        delay(10);
+    }
     
     // 7. Initialize BLE
     Serial.println("[Main] Initializing BLE...");
@@ -204,23 +301,35 @@ void setup() {
             if (lapCounterService.begin(&beaconService)) {
                 Serial.println("[Main] LapCounterService initialized");
                 
-                // Load teams from persistence
+                // Load teams from persistence and enable auto-save
                 if (persistenceService.begin()) {
                     Serial.println("[Main] PersistenceService initialized");
                     lapCounterService.loadTeams(&persistenceService);
+                    lapCounterService.setPersistenceService(&persistenceService);
+                    
+                    // Load persisted race settings
+                    int32_t savedMinLap = persistenceService.loadInt("minLapTime", MIN_LAP_TIME);
+                    lapCounterService.setMinLapTime((uint32_t)savedMinLap);
+                    int8_t savedNear = (int8_t)persistenceService.loadInt("rssiNear", DEFAULT_LAP_RSSI_NEAR);
+                    int8_t savedFar = (int8_t)persistenceService.loadInt("rssiFar", DEFAULT_LAP_RSSI_FAR);
+                    lapCounterService.setRssiNear(savedNear);
+                    lapCounterService.setRssiFar(savedFar);
+                    Serial.printf("[Main] Min lap: %lds, RSSI near: %d, far: %d\n",
+                                  savedMinLap / 1000, savedNear, savedFar);
+                    Serial.println("[Main] Auto-save enabled for team changes");
                 }
             }
             
             if (dataLoggerService.begin(&sdCard)) {
                 Serial.println("[Main] DataLoggerService initialized");
+                lapCounterService.setDataLogger(&dataLoggerService);
+                lvglRaceRunningScreen.setDataLogger(&dataLoggerService);
+                Serial.println("[Main] DataLogger wired into race flow");
             }
             
-            // Set beacon callback for testing (only Serial, no Display!)
-            beaconService.setBeaconCallback([](const BeaconInfo& beacon) {
-                Serial.printf("[Beacon] MAC=%s, RSSI=%d dBm (avg=%d), UUID=%s, Major=%u, Minor=%u\n",
-                             beacon.macAddress.c_str(), beacon.rssi, beacon.avgRssi,
-                             beacon.uuid.c_str(), beacon.major, beacon.minor);
-            });
+            // Start BLE scanning in background (LapCounter callback already set by begin())
+            beaconService.startScanning(0);
+            Serial.println("[Main] BLE scanning started");
         } else {
             Serial.println("[Main] ERROR: BeaconService failed");
         }
@@ -228,8 +337,6 @@ void setup() {
         Serial.println("[Main] ERROR: BLE initialization failed");
     }
     
-    // 6. LVGL Test Screen is already created above
-    // No need for old Navigation/Screen system - we're using LVGL now
     #endif
     
     Serial.println("\nSetup complete!");

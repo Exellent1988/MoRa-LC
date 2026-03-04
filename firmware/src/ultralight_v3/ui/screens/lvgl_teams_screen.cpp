@@ -2,6 +2,7 @@
 #include "lvgl_beacon_assign_screen.h"
 #include "lvgl_team_edit_screen.h"
 #include "../navigation_lvgl.h"
+#include "../widgets/dialog_manager.h"
 #include <Arduino.h>
 
 LVGLTeamsScreen::LVGLTeamsScreen(LVGLDisplay* lvglDisplay, LapCounterService* lapCounter)
@@ -11,7 +12,8 @@ LVGLTeamsScreen::LVGLTeamsScreen(LVGLDisplay* lvglDisplay, LapCounterService* la
     , _beaconAssignScreen(nullptr)
     , _teamEditScreen(nullptr)
     , _list(nullptr)
-    , _addButton(nullptr) {
+    , _addButton(nullptr)
+    , _pendingDeleteTeamId(0) {
 }
 
 LVGLTeamsScreen::~LVGLTeamsScreen() {
@@ -79,14 +81,17 @@ void LVGLTeamsScreen::updateTeamList() {
         return;
     }
     
-    // Add teams to list (ASCII only)
     for (TeamData* team : teams) {
         char info[128];
         if (team->beaconUUID.length() > 0) {
-            snprintf(info, sizeof(info), "%u. %s\nBeacon: %.12s", 
-                    team->teamId, team->teamName.c_str(), team->beaconUUID.c_str());
+            // Show only unique suffix (last 5 chars, e.g. "d9:2b")
+            const char* mac = team->beaconUUID.c_str();
+            int len = team->beaconUUID.length();
+            const char* suffix = (len > 5) ? mac + len - 5 : mac;
+            snprintf(info, sizeof(info), "%u. %s [%s]", 
+                    team->teamId, team->teamName.c_str(), suffix);
         } else {
-            snprintf(info, sizeof(info), "%u. %s\nNo Beacon", 
+            snprintf(info, sizeof(info), "%u. %s (no beacon)", 
                     team->teamId, team->teamName.c_str());
         }
         
@@ -158,11 +163,27 @@ void LVGLTeamsScreen::showDeleteConfirmDialog(uint8_t teamId) {
     
     Serial.printf("[LVGLTeams] Showing delete confirmation for team %u: %s\n", teamId, team->teamName.c_str());
     
-    // Simple confirmation - delete directly for now
-    // TODO: Add proper LVGL dialog
-    if (_lapCounter->removeTeam(teamId)) {
+    _pendingDeleteTeamId = teamId;
+    
+    char message[80];
+    snprintf(message, sizeof(message), "Delete team '%s'?", team->teamName.c_str());
+    
+    DialogManager::getInstance()->showConfirm("Delete Team",
+        message,
+        "Yes", "Cancel",
+        deleteConfirmHandler, nullptr,
+        this);
+}
+
+void LVGLTeamsScreen::deleteConfirmHandler(lv_event_t* e) {
+    LVGLTeamsScreen* screen = (LVGLTeamsScreen*)lv_event_get_user_data(e);
+    if (!screen || !screen->_lapCounter) return;
+    
+    uint8_t teamId = screen->_pendingDeleteTeamId;
+    if (teamId > 0 && screen->_lapCounter->removeTeam(teamId)) {
         Serial.printf("[LVGLTeams] Team %u deleted\n", teamId);
-        updateTeamList();
+        screen->_pendingDeleteTeamId = 0;
+        screen->updateTeamList();
     }
 }
 

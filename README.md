@@ -61,22 +61,27 @@ MoRa-LC/
 
 ## 🚀 Schnellstart
 
-### UltraLight (Einfacher Start)
+### UltraLight v3 (Einfacher Start)
 
 **Hardware benötigt:**
 - CheapYellow Display (ESP32-2432S028) - ~15€
 - 3x Xiaomi Mi Beacon für Tests - ~9€
+- MicroSD-Karte (FAT32, ≤32GB) - ~5€
 - Powerbank - ~15€
 
 **Software-Setup:**
 ```bash
-# PlatformIO installieren (VS Code Extension)
-# Dann:
-cd firmware/ultralight
-pio run -t upload
+# PlatformIO installieren (VS Code Extension oder CLI)
+# Dann aus dem firmware/ Verzeichnis:
+cd firmware
+pio run -e ultralight_v3 -t upload
+
+# Mit Serial Monitor:
+pio run -e ultralight_v3 -t upload && pio device monitor
 ```
 
-Siehe `docs/ultralight-quickstart.md` für Details.
+Beacons sind Xiaomi Mi Beacons mit MAC-Prefix `c3:00:` – standard Werkseinstellung.
+RSSI-Schwellwerte in `src/ultralight_v3/core/config.h` konfigurierbar.
 
 ### FullBlown (Komplettes System)
 
@@ -191,12 +196,16 @@ npm install
 ✅ Team-Login & Detailauswertung  
 ✅ GPS/UWB erweiterbar  
 
-### UltraLight
-✅ Rundenzählung & Zeiten  
-✅ Touch-UI auf Display  
-✅ Team-Management  
-✅ SD-Karte Logging
+### UltraLight v3
+✅ Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far)  
+✅ Touch-UI auf Display (LVGL8, 10 Screens)  
+✅ Team-Management (NVS-Persistenz)  
+✅ SD-Karte Logging (CSV pro Rennen)  
+✅ Race History (3 Ebenen: Rennliste → Leaderboard → Team-Laps)  
 ✅ RSSI-basierte Beacon-Zuordnung  
+✅ Konfigurierbare Settings (Min Lap Time, RSSI Near/Far)  
+✅ Debug Screen (Live RSSI, Near/Far/Mid farbcodiert)  
+✅ BLE Passive Scan (50ms Interval, schnelle Erkennung)  
 ❌ Keine Karte/Live-Position  
 ❌ Keine IMU-Sensoren  
 ❌ Keine Cloud-Features  
@@ -233,15 +242,20 @@ Bei Fragen oder Problemen: [Issue erstellen](../../issues)
 
 **Aktueller Fortschritt:**
 - [x] Projekt-Setup & Planung
-- [x] **UltraLight Prototyp** - ✅ **Bereit zum Testen!**
-  - [x] On-Screen Keyboard & Number Picker
-  - [x] Persistenz (Teams bleiben nach Neustart erhalten)
-  - [x] Vollständige Touch-UI mit allen Screens
-  - [x] BLE Beacon Scanning & RSSI-basierte Rundenzählung
-  - [x] SD-Karte Logging (CSV Export)
-  - Siehe [UltraLight Build Guide](docs/ultralight-build.md)
+- [x] **UltraLight v3** - **Hardware-getestet!**
+  - [x] Clean Architecture (Services, Hardware-Abstraction, LVGL8 UI)
+  - [x] 10 Screens: Home, Teams, TeamEdit, BeaconAssign, RaceSetup, RaceRunning, RaceResults, Settings, Debug, BLETest
+  - [x] Overlay On-Screen Keyboard für Team-Namen & Rennnamen
+  - [x] Persistenz – Teams, RSSI-Settings, Min Lap Time (NVS)
+  - [x] BLE Passive Scan (NimBLE, 50ms, 3-Sample RSSI)
+  - [x] Hysteresis-Rundenzählung (Raw RSSI Near / Avg RSSI Far)
+  - [x] Konfigurierbare Settings via +/- Modal-Dialog
+  - [x] Race History: 3-Ebenen CSV-basiert (Rennliste → Leaderboard → Team-Laps)
+  - [x] Debug Screen: Live RSSI, Near/Far/Mid farbcodiert
+  - [x] Auto-Stop, Timer/Board Toggle, Rennname in CSV
+  - [x] SD-Karte CSV Logging mit Rundenzeiten, RSSI, Time-of-Day
+  - [x] Hardware-Test: Touch, Display, BLE, SD, Rundenzählung verifiziert
 - [ ] FullBlown Basis-System
-- [ ] Field-Tests
-- [ ] Finale Features
+- [ ] Abschluss-Features
 
-Siehe [TODOs](.cursor/plans/) für Details.
+Siehe [STATUS.md](STATUS.md) für Details.

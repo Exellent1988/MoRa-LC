@@ -10,7 +10,9 @@ LVGLBeaconAssignScreen::LVGLBeaconAssignScreen(LVGLDisplay* lvglDisplay, BeaconS
     , _teamId(0)
     , _instructionLabel(nullptr)
     , _beaconList(nullptr)
-    , _lastUpdate(0) {
+    , _lastUpdate(0)
+    , _macCount(0)
+    , _lastBeaconCount(-1) {
 }
 
 LVGLBeaconAssignScreen::~LVGLBeaconAssignScreen() {
@@ -24,84 +26,146 @@ void LVGLBeaconAssignScreen::onEnter() {
     
     Serial.println("[LVGLBeaconAssign] Creating beacon assign screen...");
     
-    // Get current screen
     _screen = _lvglDisplay->getScreen();
-    
-    // Clear screen
     lv_obj_clean(_screen);
-    
-    // Set background color
     lv_obj_set_style_bg_color(_screen, rgb565ToLVGL(Colors::BACKGROUND), LV_PART_MAIN);
     
-    // Create header with back button (ASCII only)
     createHeader("Assign Beacon", true, backBtnEventHandler, this);
     
-    // Instruction (ASCII only)
     TeamData* team = _lapCounter ? _lapCounter->getTeam(_teamId) : nullptr;
-    String instruction = "Select Beacon for Team";
+    String instruction = "Select beacon for team";
     if (team) {
         instruction = "Beacon for: " + team->teamName;
     }
     
-    _instructionLabel = createLabel(instruction.c_str(), Spacing::MD, HEADER_HEIGHT + Spacing::SM,
-                                   SCREEN_WIDTH - 2 * Spacing::MD, 30, rgb565ToLVGL(Colors::TEXT));
+    _instructionLabel = createLabel(instruction.c_str(), Spacing::SM, HEADER_HEIGHT + Spacing::XS,
+                                   SCREEN_WIDTH - 2 * Spacing::SM, 20, rgb565ToLVGL(Colors::TEXT));
+    lv_obj_set_style_text_font(_instructionLabel, &lv_font_montserrat_14, 0);
     
-    // Create beacon list
-    int listY = HEADER_HEIGHT + Spacing::MD + 30;
-    int listH = SCREEN_HEIGHT - listY - Spacing::MD;
-    _beaconList = createList(Spacing::MD, listY, SCREEN_WIDTH - 2 * Spacing::MD, listH);
+    int listY = HEADER_HEIGHT + Spacing::XS + 22;
+    int listH = SCREEN_HEIGHT - listY - Spacing::XS;
+    _beaconList = createList(0, listY, SCREEN_WIDTH, listH);
+    lv_obj_set_style_pad_row(_beaconList, 1, 0);
     
-    // Ensure BLE is scanning
     if (_beaconService && !_beaconService->isScanning()) {
         _beaconService->startScanning(0);
     }
     
+    _lastBeaconCount = -1;
     _lastUpdate = millis();
-    updateBeaconList();
+    rebuildBeaconList();
     
     Serial.println("[LVGLBeaconAssign] Beacon assign screen created");
 }
 
 void LVGLBeaconAssignScreen::onExit() {
-    // Cleanup if needed
 }
 
 void LVGLBeaconAssignScreen::update() {
     if (!_beaconList || !_beaconService) return;
     
-    // Update beacon list every 500ms
     uint32_t now = millis();
-    if (now - _lastUpdate > 500) {
+    if (now - _lastUpdate > 2000) {
         updateBeaconList();
         _lastUpdate = now;
     }
 }
 
+static const char* macSuffix(const String& mac) {
+    int len = mac.length();
+    return (len > 5) ? mac.c_str() + len - 5 : mac.c_str();
+}
+
+String LVGLBeaconAssignScreen::getOwnerTeamName(const String& mac) const {
+    if (!_lapCounter) return "";
+    auto teams = _lapCounter->getAllTeams();
+    for (auto* t : teams) {
+        if (t->beaconUUID == mac) {
+            return t->teamName;
+        }
+    }
+    return "";
+}
+
 void LVGLBeaconAssignScreen::updateBeaconList() {
     if (!_beaconList || !_beaconService) return;
     
-    // Clear existing list items
+    std::vector<BeaconInfo> beacons = _beaconService->getBeacons();
+    int count = (int)beacons.size();
+    
+    if (count != _lastBeaconCount) {
+        rebuildBeaconList();
+        return;
+    }
+    
+    // Only update RSSI text on existing items (no rebuild, preserves scroll)
+    uint32_t childCount = lv_obj_get_child_cnt(_beaconList);
+    int idx = 0;
+    for (const auto& beacon : beacons) {
+        if (idx >= (int)childCount || idx >= MAX_STORED_MACS) break;
+        
+        lv_obj_t* item = lv_obj_get_child(_beaconList, idx);
+        if (!item) break;
+        
+        lv_obj_t* label = lv_obj_get_child(item, 1);
+        if (label) {
+            String owner = getOwnerTeamName(beacon.macAddress);
+            char info[64];
+            if (owner.length() > 0) {
+                snprintf(info, sizeof(info), "..%s (%d) [%s]",
+                         macSuffix(beacon.macAddress), beacon.avgRssi, owner.c_str());
+            } else {
+                snprintf(info, sizeof(info), "..%s (%d dBm)",
+                         macSuffix(beacon.macAddress), beacon.avgRssi);
+            }
+            lv_label_set_text(label, info);
+        }
+        idx++;
+    }
+}
+
+void LVGLBeaconAssignScreen::rebuildBeaconList() {
+    if (!_beaconList || !_beaconService) return;
+    
     lv_obj_clean(_beaconList);
     
-    // Get beacons
     std::vector<BeaconInfo> beacons = _beaconService->getBeacons();
+    _lastBeaconCount = (int)beacons.size();
     
     if (beacons.empty()) {
-        lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, "No beacons found");
+        lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, "Scanning...");
         lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
         return;
     }
     
-    // Add beacons to list
+    _macCount = 0;
     for (const auto& beacon : beacons) {
-        char info[128];
-        snprintf(info, sizeof(info), "%s\nRSSI: %d dBm", beacon.macAddress.c_str(), beacon.avgRssi);
+        if (_macCount >= MAX_STORED_MACS) break;
+        
+        strncpy(_macStorage[_macCount], beacon.macAddress.c_str(), 17);
+        _macStorage[_macCount][17] = '\0';
+        
+        String owner = getOwnerTeamName(beacon.macAddress);
+        char info[64];
+        if (owner.length() > 0) {
+            snprintf(info, sizeof(info), "..%s (%d) [%s]",
+                     macSuffix(beacon.macAddress), beacon.avgRssi, owner.c_str());
+        } else {
+            snprintf(info, sizeof(info), "..%s (%d dBm)",
+                     macSuffix(beacon.macAddress), beacon.avgRssi);
+        }
         
         lv_obj_t* item = lv_list_add_btn(_beaconList, LV_SYMBOL_BLUETOOTH, info);
-        lv_obj_add_event_cb(item, beaconItemEventHandler, LV_EVENT_CLICKED, this);
+        lv_obj_set_height(item, 36);
+        lv_obj_set_style_pad_ver(item, 4, 0);
+        lv_obj_add_event_cb(item, beaconItemEventHandler, LV_EVENT_SHORT_CLICKED, this);
+        lv_obj_set_user_data(item, _macStorage[_macCount]);
         
-        // Store beacon UUID in user data (we'll use a simple string copy)
-        // For now, use the label text to identify the beacon
+        if (owner.length() > 0) {
+            lv_obj_set_style_bg_color(item, rgb565ToLVGL(Colors::SURFACE), 0);
+        }
+        
+        _macCount++;
     }
 }
 
@@ -117,19 +181,18 @@ void LVGLBeaconAssignScreen::beaconItemEventHandler(lv_event_t* e) {
     LVGLBeaconAssignScreen* screen = (LVGLBeaconAssignScreen*)lv_event_get_user_data(e);
     if (!screen || !screen->_lapCounter) return;
     
-    // Get beacon UUID from list item (we'll use the label text)
     lv_obj_t* item = lv_event_get_target(e);
-    lv_obj_t* label = lv_obj_get_child(item, 1); // Second child is usually the label
-    if (label) {
-        const char* text = lv_label_get_text(label);
-        // Extract MAC address from text (first line before \n)
-        String macAddress = String(text);
-        int newlinePos = macAddress.indexOf('\n');
-        if (newlinePos > 0) {
-            macAddress = macAddress.substring(0, newlinePos);
-        }
-        
-        screen->assignBeaconToTeam(macAddress);
+    if (!item) return;
+    
+    // Walk up to the list button if we clicked on a child (label/icon)
+    while (item && lv_obj_get_parent(item) != screen->_beaconList) {
+        item = lv_obj_get_parent(item);
+    }
+    if (!item) return;
+    
+    const char* mac = (const char*)lv_obj_get_user_data(item);
+    if (mac) {
+        screen->assignBeaconToTeam(String(mac));
     }
 }
 
@@ -139,7 +202,6 @@ void LVGLBeaconAssignScreen::assignBeaconToTeam(const String& beaconUUID) {
     if (_lapCounter->assignBeacon(_teamId, beaconUUID)) {
         Serial.printf("[LVGLBeaconAssign] Beacon %s assigned to team %u\n", beaconUUID.c_str(), _teamId);
         
-        // Navigate back
         if (_navigation) {
             _navigation->goBack();
         }

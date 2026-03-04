@@ -18,9 +18,10 @@ public:
     LGFX(void)
     {
         // SPI Bus Configuration for Display
+        // Pins 14/13/12 are native HSPI pins; using HSPI frees VSPI for SD card
         {
             auto cfg = _bus_instance.config();
-            cfg.spi_host = VSPI_HOST;          // Use VSPI
+            cfg.spi_host = HSPI_HOST;
             cfg.spi_mode = 0;
             cfg.freq_write = 40000000;         // 40 MHz
             cfg.freq_read = 20000000;          // 20 MHz
@@ -51,25 +52,26 @@ public:
             cfg.dummy_read_pixel = 8;
             cfg.dummy_read_bits = 1;
             cfg.readable = true;
-            cfg.invert = false;
-            cfg.rgb_order = false;
+            cfg.invert = true;
+            cfg.rgb_order = true;   /* ST7789: BGR order - fixes red/blue swap */
             cfg.dlen_16bit = false;
             cfg.bus_shared = false;            // Display has its own SPI bus
             _panel_instance.config(cfg);
         }
 
         // Touch Configuration (XPT2046)
+        // Software SPI (GPIO bitbang) - Display uses HSPI, SD uses VSPI, no HW SPI left
         {
             auto cfg = _touch_instance.config();
             cfg.x_min = 200;
             cfg.x_max = 3700;
             cfg.y_min = 200;
             cfg.y_max = 3800;
-            cfg.pin_int = TOUCH_IRQ_PIN;       // 36 (optional)
-            cfg.bus_shared = false;            // Touch has separate SPI bus
+            cfg.pin_int = -1;                  // Disabled: GPIO36 unreliable when BLE active (ESP32 errata)
+            cfg.bus_shared = false;
             cfg.offset_rotation = 0;
-            cfg.spi_host = HSPI_HOST;          // Use HSPI for Touch (separate from Display)
-            cfg.freq = 2500000;                 // 2.5 MHz
+            cfg.spi_host = -1;                 // Software SPI (bitbang) - no HW SPI host conflict
+            cfg.freq = 1000000;                // 1 MHz (sufficient for touch, gentle on CPU)
             cfg.pin_sclk = TOUCH_CLK_PIN;      // 25
             cfg.pin_mosi = TOUCH_MOSI_PIN;     // 32
             cfg.pin_miso = TOUCH_MISO_PIN;     // 39

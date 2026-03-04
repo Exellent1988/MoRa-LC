@@ -27,12 +27,11 @@ bool Display::begin() {
     
     _initialized = true;
     Serial.println("[Display] Initialized successfully");
+    
     return true;
 }
 
 void Display::configureLGFX() {
-    // LGFX is configured in constructor via LGFX_Config.hpp
-    // This method is kept for future extensibility
 }
 
 void Display::fillScreen(uint16_t color) {
@@ -62,20 +61,13 @@ void Display::println(const String& text) {
 bool Display::getTouch(uint16_t* x, uint16_t* y) {
     if (!_initialized) return false;
     
-    // LovyanGFX getTouch() returns calibrated coordinates directly
-    // No need for manual calibration mapping if setTouchCalibrate() was called
     uint16_t tx, ty;
     if (_lgfx.getTouch(&tx, &ty)) {
-        // Clamp to screen bounds (safety check)
         tx = constrain(tx, 0, SCREEN_WIDTH - 1);
         ty = constrain(ty, 0, SCREEN_HEIGHT - 1);
         
         *x = tx;
         *y = ty;
-        
-        // Debug output (uncomment for testing)
-        // Serial.printf("[Touch] x=%u, y=%u\n", *x, *y);
-        
         return true;
     }
     return false;
@@ -86,4 +78,3 @@ bool Display::isTouched() {
     int16_t x, y;
     return _lgfx.getTouch(&x, &y);
 }
-

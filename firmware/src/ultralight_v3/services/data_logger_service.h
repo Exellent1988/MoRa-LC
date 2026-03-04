@@ -7,6 +7,7 @@
 #include <SD.h>
 #include <queue>
 #include <string>
+#include <vector>
 
 /**
  * Data Logger Service
@@ -50,6 +51,12 @@ public:
     bool createRaceFile(const String& raceName);
     void closeRaceFile();
     
+    // Race history
+    std::vector<String> getRaceFiles(uint8_t maxFiles = 10);
+    String readFile(const String& path);
+    bool fileExists(const String& path);
+    String getCurrentRaceFile() const { return _currentFilePath; }
+    
     // Status
     bool isReady() const { return _initialized && _sdCard && _sdCard->isReady(); }
     
@@ -59,7 +66,9 @@ private:
     std::queue<LogEntry> _logQueue;
     File _raceFile;  // Arduino SD File type
     String _currentRaceName;
+    String _currentFilePath;
     uint32_t _lastFlush;
+    uint32_t _raceStartMs;
     
     // Helper methods
     bool writeEntry(const LogEntry& entry);
