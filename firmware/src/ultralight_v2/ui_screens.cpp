@@ -432,6 +432,20 @@ void drawRaceRunningScreen() {
     sprintf(timeStr, "%02lu:%02lu", minutes, seconds);
     lcd.drawString("Zeit: " + String(timeStr), SCREEN_WIDTH / 2, HEADER_HEIGHT / 2);
     
+    // SD-Status (rot/orange = Logging gefaehrdet)
+    lcd.setTextSize(1);
+    lcd.setTextDatum(TR_DATUM);
+    if (!dataLogger.isReady()) {
+        lcd.setTextColor(COLOR_WARNING);
+        lcd.drawString("KEINE SD", SCREEN_WIDTH - 4, 4);
+    } else if (dataLogger.hasError()) {
+        lcd.setTextColor(COLOR_WARNING);
+        lcd.drawString("SD FEHLER", SCREEN_WIDTH - 4, 4);
+    } else {
+        lcd.setTextColor(COLOR_HEADER_TEXT);
+        lcd.drawString("SD ok", SCREEN_WIDTH - 4, 4);
+    }
+    
     // Leaderboard - größere Items, besser lesbar
     auto leaderboard = lapCounter.getLeaderboard(true);
     

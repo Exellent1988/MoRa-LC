@@ -7,6 +7,7 @@
 #include "../../lib/BLEScanner/BLEScanner.h"
 #include "../../lib/LapCounter/LapCounter.h"
 #include "../../lib/DataLogger/DataLogger.h"
+#include "../../lib/LapDetector/LapDetector.h"
 #include "../ultralight/persistence.h"
 #include <map>
 
@@ -33,49 +34,114 @@ int8_t lapRssiNear = DEFAULT_LAP_RSSI_NEAR;
 int8_t lapRssiFar = DEFAULT_LAP_RSSI_FAR;
 std::map<uint8_t, bool> beaconPresence;
 
-// BLE Callback for lap detection
-void onBeaconDetected(const BeaconData& beacon) {
-    // Only count laps during race
-    if (!raceRunning) {
-        return;
+// Lap-Detektoren pro Team (Zugriff nur aus loop(), nicht aus dem BLE-Task!)
+std::map<uint8_t, LapDetector> lapDetectors;
+std::map<uint64_t, uint8_t> macToTeam;   // MAC (48 bit) -> teamId, wird bei Rennstart gebaut
+
+static uint64_t macKey(const uint8_t mac[6]) {
+    uint64_t k = 0;
+    for (int i = 5; i >= 0; i--) k = (k << 8) | mac[i];
+    return k;
+}
+
+static bool parseMac(const String& s, uint64_t& key) {
+    unsigned b[6];
+    if (sscanf(s.c_str(), "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6) return false;
+    key = 0;
+    for (int i = 0; i < 6; i++) key = (key << 8) | (b[i] & 0xFF);
+    return true;
+}
+
+static LapDetectorConfig makeDetectorConfig() {
+    LapDetectorConfig c;
+    c.nearRssi = lapRssiNear;
+    c.farRssi = lapRssiFar;
+    c.minLapMs = MIN_LAP_TIME;
+    c.lostTimeoutMs = LAP_LOST_TIMEOUT_MS;
+    c.smoothing = LAP_RSSI_SMOOTHING;
+    return c;
+}
+
+// Beim (Wieder-)Start: Zuordnung neu bauen, Detektoren zuruecksetzen
+static void prepareRaceTracking() {
+    macToTeam.clear();
+    lapDetectors.clear();
+    for (TeamData* t : lapCounter.getAllTeams()) {
+        uint64_t key;
+        if (parseMac(t->beaconUUID, key)) {
+            macToTeam[key] = t->teamId;
+            lapDetectors[t->teamId] = LapDetector(makeDetectorConfig());
+        }
     }
-    
-    // Check if beacon belongs to a team (by MAC address)
-    TeamData* team = lapCounter.getTeamByBeacon(beacon.macAddress);
-    
-    if (!team) {
-        // Unknown beacon - silent
-        return;
+    Serial.printf("[Race] Tracking %u teams\n", (unsigned)macToTeam.size());
+}
+
+static void handleLap(TeamData* team, uint32_t lapTs) {
+    if (!lapCounter.recordLap(team->teamId, lapTs)) return;
+
+    Serial.printf("[Lap] Team %u (%s): Lap %u\n",
+                  team->teamId, team->teamName.c_str(), team->lapCount);
+
+    if (dataLogger.isReady() && !team->laps.empty()) {
+        LapTime& lap = team->laps.back();
+        dataLogger.logLap(team->teamId, team->teamName,
+                          lap.lapNumber, lap.timestamp, lap.duration);
     }
-    
-    // RSSI-based presence detection with hysteresis
-    if (beacon.rssi > lapRssiNear) {
-        // Beacon is NEAR (strong signal)
-        if (!beaconPresence[team->teamId]) {
-            // Was away, now near → count lap!
-            if (lapCounter.recordLap(team->teamId, beacon.lastSeen)) {
-                Serial.printf("[Lap] ✅ Team %u (%s): Lap %u\n",
-                             team->teamId, team->teamName.c_str(), team->lapCount);
-                
-                // Log to SD
-                if (dataLogger.isReady() && !team->laps.empty()) {
-                    LapTime& lap = team->laps.back();
-                    dataLogger.logLap(team->teamId, team->teamName, 
-                                     lap.lapNumber, lap.timestamp, lap.duration);
-                }
-                
-                // Update screen
-                uiState.needsRedraw = true;
+    uiState.needsRedraw = true;
+}
+
+// Alle Pakete aus der BLE-Queue abarbeiten (im Loop, nicht im BLE-Task)
+static void processBeaconSamples() {
+    static bool wasRunning = false;
+    if (raceRunning && !wasRunning) prepareRaceTracking();
+    wasRunning = raceRunning;
+
+    BeaconSample sample;
+    char macStr[18];
+    uint8_t budget = 100;  // pro Loop-Durchlauf begrenzen, damit Touch/UI nicht haengen
+    while (budget-- && bleScanner.popSample(sample)) {
+        if (!raceRunning) continue;  // ausserhalb des Rennens verwerfen
+
+        BLEScanner::macToString(sample.mac, macStr);
+        dataLogger.logRaw(sample.ts, macStr, sample.rssi);
+
+        auto tm = macToTeam.find(macKey(sample.mac));
+        if (tm == macToTeam.end()) continue;
+        TeamData* team = lapCounter.getTeam(tm->second);
+        if (!team) continue;
+
+        uint32_t lapTs;
+        if (lapDetectors[team->teamId].onSample(sample.ts, sample.rssi, lapTs)) {
+            handleLap(team, lapTs);
+        }
+    }
+
+    if (raceRunning) {
+        // Beacon verschwunden -> Durchfahrt abschliessen
+        uint32_t now = millis();
+        for (auto& kv : lapDetectors) {
+            uint32_t lapTs;
+            if (kv.second.tick(now, lapTs)) {
+                TeamData* team = lapCounter.getTeam(kv.first);
+                if (team) handleLap(team, lapTs);
             }
-            
-            beaconPresence[team->teamId] = true;
         }
-    } else if (beacon.rssi < lapRssiFar) {
-        // Beacon is AWAY (weak signal)
-        if (beaconPresence[team->teamId]) {
-            beaconPresence[team->teamId] = false;
-        }
+        dataLogger.serviceRaw();
     }
+}
+
+// Alle 5 s eine Diagnosezeile (Pakete, Queue-Verluste, SD-Fehler)
+static void printDiagnostics() {
+    static uint32_t last = 0;
+    static uint32_t lastSamples = 0;
+    if (!raceRunning || millis() - last < 5000) return;
+    last = millis();
+    uint32_t total = 0;
+    for (auto& kv : lapDetectors) total += kv.second.sampleCount();
+    Serial.printf("[Diag] pkts/5s=%u dropped=%u sdErr=%u laps=%u heap=%u\n",
+                  total - lastSamples, bleScanner.droppedSamples(),
+                  dataLogger.getWriteErrors(), dataLogger.getLapsLogged(), ESP.getFreeHeap());
+    lastSamples = total;
 }
 
 // ============================================================
@@ -171,6 +237,13 @@ void setup() {
         while(1) delay(1000);
     }
     
+    // SD nach Display-Init erneut pruefen (gleicher SPI-Host!) und ggf. neu initialisieren
+    if (dataLogger.isReady() && !dataLogger.selfTest()) {
+        Serial.println("[SD] Self-test failed after display init, re-initializing...");
+        dataLogger.begin(SD_CS_PIN);
+        if (!dataLogger.selfTest()) Serial.println("[SD] ERROR: SD unusable");
+    }
+    
     // Show initialization screen
     display.fillScreen(BACKGROUND_COLOR);
     display.setTextColor(TEXT_COLOR);
@@ -194,7 +267,6 @@ void setup() {
     
     // 3. BLE Scanner
     initBLE();
-    bleScanner.onBeaconDetected(onBeaconDetected);  // Set callback for lap detection
     display.setCursor(10, 100);
     display.println("BLE: OK");
     
@@ -253,6 +325,11 @@ void loop() {
         
         handleTouch(x, y);
     }
+    
+    // BLE-Pakete auswerten (Lap-Erkennung + Roh-Log); Beacon-Liste nur ausserhalb des Rennens pflegen
+    bleScanner.setListEnabled(!raceRunning);
+    processBeaconSamples();
+    printDiagnostics();
     
     // Screen redraw if needed
     if (uiState.needsRedraw) {

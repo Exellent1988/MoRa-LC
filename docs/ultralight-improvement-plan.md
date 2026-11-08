@@ -55,3 +55,16 @@ Stand: Analyse von `firmware/src/ultralight_v2` + `lib/` (Default-Env `ultraligh
 **Vorschlag:** GPS (10 Hz, M10-Modul) + LoRa/ESP-NOW für Position und Karte; BLE-Ziellinie (die bestehende CYD-Lösung) bleibt als präziser Rundenzähler/Backup. Die vorhandenen ESPs können als Sender (am Fahrzeug) und als Gateway dienen; BLE-Beacons bleiben für die Ziellinie.
 
 Offene Fragen für die Auswahl: Streckenlänge/-form, Indoor oder Outdoor, wie viele Fahrzeuge max., gewünschte Update-Rate auf der Karte.
+
+## 4. Umsetzungsstand
+
+Umgesetzt (kompiliert mit `pio run -e ultralight_v2`, **noch nicht auf Hardware getestet**):
+
+- B1: Display ohne MISO-Pin (`LGFX_Config.hpp`), SD-Selbsttest nach Display-Init + Re-Init bei Fehler.
+- B2/B3: BLE-Callback legt nur noch Roh-Pakete in eine Queue (`BLEScanner::popSample`); Auswertung in `loop()`; Beacon-Liste per Mutex, waehrend des Rennens abgeschaltet.
+- B4/B5/B7: neue `LapDetector`-Klasse (Glaettung, Peak-Zeitstempel, Timeout fuer "weg", Mindestrundenzeit aus Config).
+- B6: Passiver Scan, Interval = Window, nicht-blockierender Scan-Start, Neustart wenn Scan stoppt.
+- B8: SD-Dateien bleiben offen, `flush()` pro Runde, Recover bei Schreibfehler, Fehleranzeige im Rennscreen, Dateikollisionen nach Reboot behoben.
+- Phase 2: Roh-Log `*_raw.csv`, native Tests (`firmware/tools/run_native_tests.sh`), Replay-Tool (`firmware/tools/replay/replay.cpp`), Diagnose-Zeile alle 5 s im Serial.
+
+Offen: B9 (Crash-Recovery), Diagnose-Screen im UI, Beacon-Simulator, RTC/NTP.

@@ -29,7 +29,10 @@ public:
             cfg.dma_channel = 1;
             cfg.pin_sclk = TFT_SCLK_PIN;       // 14
             cfg.pin_mosi = TFT_MOSI_PIN;       // 13
-            cfg.pin_miso = TFT_MISO_PIN;       // 12
+            // MISO bewusst NICHT belegen: Display wird nie gelesen. Sonst haengt LovyanGFX den
+            // MISO-Eingang des gemeinsamen VSPI-Hosts auf GPIO12 und die SD-Karte (MISO=19,
+            // gleicher Host) bekommt keine Antworten mehr -> nichts wird auf SD geschrieben.
+            cfg.pin_miso = -1;
             cfg.pin_dc = TFT_DC_PIN;           // 2
             _bus_instance.config(cfg);
             _panel_instance.setBus(&_bus_instance);
@@ -53,7 +56,7 @@ public:
             cfg.offset_rotation = 0;
             cfg.dummy_read_pixel = 8;
             cfg.dummy_read_bits = 1;
-            cfg.readable = true;
+            cfg.readable = false;              // siehe pin_miso
             cfg.invert = false;
             cfg.rgb_order = false;
             cfg.dlen_16bit = false;

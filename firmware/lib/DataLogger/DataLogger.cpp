@@ -3,7 +3,14 @@
 DataLogger::DataLogger() 
     : initialized(false)
     , currentRaceFile("")
-    , raceStartTime(0) {
+    , currentRawFile("")
+    , raceStartTime(0)
+    , csPin(5)
+    , rawLen(0)
+    , lastRawFlush(0)
+    , writeErrors(0)
+    , lapsLogged(0)
+    , lastWriteFailed(false) {
 }
 
 DataLogger::~DataLogger() {
@@ -11,6 +18,7 @@ DataLogger::~DataLogger() {
 
 bool DataLogger::begin(uint8_t csPin) {
     Serial.printf("[DataLogger] Initializing SD card (CS Pin: %u)...\n", csPin);
+    this->csPin = csPin;
     
     if (!SD.begin(csPin)) {
         Serial.println("[DataLogger] ERROR: SD card initialization failed");
@@ -47,6 +55,23 @@ bool DataLogger::begin(uint8_t csPin) {
     initialized = true;
     Serial.println("[DataLogger] Initialized successfully");
     return true;
+}
+
+bool DataLogger::selfTest() {
+    if (!initialized) return false;
+    const char* path = "/races/.sdtest";
+    File f = SD.open(path, FILE_WRITE);
+    if (!f) return false;
+    size_t n = f.print("ok");
+    f.close();
+    bool ok = (n == 2);
+    f = SD.open(path, FILE_READ);
+    if (!f) return false;
+    ok = ok && f.available() == 2;
+    f.close();
+    SD.remove(path);
+    Serial.printf("[DataLogger] Self-test: %s\n", ok ? "OK" : "FAILED");
+    return ok;
 }
 
 bool DataLogger::isReady() {
@@ -134,14 +159,76 @@ bool DataLogger::startNewRace(const String& raceName) {
         return false;
     }
     
-    currentRaceFile = generateRaceFilename(raceName);
+    // Alte Handles schliessen (falls vorheriges Rennen nicht sauber beendet wurde)
+    if (lapFile) lapFile.close();
+    if (rawFile) rawFile.close();
+
+    String base = generateRaceFilename(raceName);  // ".../name.csv"
+    base.replace(".csv", "");
+    // Keine bestehende Datei weiterschreiben (millis()-basierte Namen kollidieren nach Reboot)
+    String path = base + ".csv";
+    for (int i = 2; SD.exists(path.c_str()) && i < 100; i++) {
+        path = base + "_" + String(i) + ".csv";
+    }
+    currentRaceFile = path;
+    currentRawFile = path;
+    currentRawFile.replace(".csv", "_raw.csv");
     raceStartTime = millis();
+    rawLen = 0;
+    lastRawFlush = millis();
+    lapsLogged = 0;
+    writeErrors = 0;
+    lastWriteFailed = false;
     
     Serial.printf("[DataLogger] New race started: %s\n", currentRaceFile.c_str());
     
-    // CSV Header erstellen
-    String header = "Team ID,Team Name,Lap Number,Timestamp (ms),Duration (ms),Time of Day";
-    return createCSVHeader(currentRaceFile, header);
+    lapFile = SD.open(currentRaceFile.c_str(), FILE_WRITE);
+    rawFile = SD.open(currentRawFile.c_str(), FILE_WRITE);
+    if (!lapFile) {
+        Serial.println("[DataLogger] ERROR: cannot open lap file");
+        lastWriteFailed = true;
+        writeErrors++;
+        return false;
+    }
+    lapFile.println("Team ID,Team Name,Lap Number,Timestamp (ms),Duration (ms),Time of Day");
+    lapFile.flush();
+    if (rawFile) {
+        rawFile.println("ms,mac,rssi");
+        rawFile.flush();
+    }
+    return true;
+}
+
+bool DataLogger::recover() {
+    Serial.println("[DataLogger] Recovering SD card...");
+    if (lapFile) lapFile.close();
+    if (rawFile) rawFile.close();
+    SD.end();
+    if (!SD.begin(csPin)) {
+        Serial.println("[DataLogger] Recover failed: SD.begin");
+        return false;
+    }
+    if (!currentRaceFile.isEmpty()) lapFile = SD.open(currentRaceFile.c_str(), FILE_APPEND);
+    if (!currentRawFile.isEmpty()) rawFile = SD.open(currentRawFile.c_str(), FILE_APPEND);
+    return (bool)lapFile;
+}
+
+bool DataLogger::appendLine(File& f, const char* path, const String& line) {
+    for (int attempt = 0; attempt < 2; attempt++) {
+        if (f) {
+            size_t n = f.println(line);
+            f.flush();
+            if (n >= line.length()) {
+                lastWriteFailed = false;
+                return true;
+            }
+        }
+        writeErrors++;
+        lastWriteFailed = true;
+        Serial.printf("[DataLogger] Write failed (%s), attempt %d\n", path, attempt + 1);
+        if (attempt == 0 && !recover()) break;
+    }
+    return false;
 }
 
 bool DataLogger::logLap(uint8_t teamId, const String& teamName, uint16_t lapNumber, 
@@ -151,16 +238,16 @@ bool DataLogger::logLap(uint8_t teamId, const String& teamName, uint16_t lapNumb
         return false;
     }
     
-    // Time of Day formatieren (HH:MM:SS)
+    // Zeit seit Rennstart (HH:MM:SS)
     uint32_t seconds = (timestamp - raceStartTime) / 1000;
     uint32_t hours = seconds / 3600;
     uint32_t minutes = (seconds % 3600) / 60;
     uint32_t secs = seconds % 60;
     
     char timeStr[16];
-    sprintf(timeStr, "%02lu:%02lu:%02lu", hours, minutes, secs);
+    snprintf(timeStr, sizeof(timeStr), "%02lu:%02lu:%02lu",
+             (unsigned long)hours, (unsigned long)minutes, (unsigned long)secs);
     
-    // CSV Zeile erstellen
     String csvLine = String(teamId) + ",";
     csvLine += teamName + ",";
     csvLine += String(lapNumber) + ",";
@@ -168,7 +255,32 @@ bool DataLogger::logLap(uint8_t teamId, const String& teamName, uint16_t lapNumb
     csvLine += String(duration) + ",";
     csvLine += String(timeStr);
     
-    return logCSV(currentRaceFile, csvLine);
+    bool ok = appendLine(lapFile, currentRaceFile.c_str(), csvLine);
+    if (ok) lapsLogged++;
+    return ok;
+}
+
+void DataLogger::logRaw(uint32_t ts, const char* mac, int8_t rssi) {
+    if (!initialized || currentRawFile.isEmpty()) return;
+    if (rawLen + 40 >= sizeof(rawBuf)) serviceRaw(true);
+    int n = snprintf(rawBuf + rawLen, sizeof(rawBuf) - rawLen, "%lu,%s,%d\n",
+                     (unsigned long)ts, mac, (int)rssi);
+    if (n > 0) rawLen += n;
+}
+
+void DataLogger::serviceRaw(bool force) {
+    if (rawLen == 0) return;
+    if (!force && millis() - lastRawFlush < 1000) return;
+    lastRawFlush = millis();
+    if (rawFile) {
+        size_t n = rawFile.write((const uint8_t*)rawBuf, rawLen);
+        rawFile.flush();
+        if (n != rawLen) {
+            writeErrors++;
+            lastWriteFailed = true;
+        }
+    }
+    rawLen = 0;  // Rohdaten sind "best effort": bei Fehler nicht endlos puffern
 }
 
 bool DataLogger::finishRace() {
@@ -176,20 +288,26 @@ bool DataLogger::finishRace() {
         return false;
     }
     
+    serviceRaw(true);
+    if (lapFile) lapFile.close();
+    if (rawFile) rawFile.close();
+    
     Serial.printf("[DataLogger] Race finished: %s\n", currentRaceFile.c_str());
     
-    // Race-Summary schreiben
     String summaryFile = currentRaceFile;
     summaryFile.replace(".csv", "_summary.txt");
     
     uint32_t raceDuration = millis() - raceStartTime;
     String summary = "Race finished\n";
     summary += "Duration: " + String(raceDuration / 1000) + " seconds\n";
+    summary += "Laps logged: " + String(lapsLogged) + "\n";
+    summary += "Write errors: " + String(writeErrors) + "\n";
     summary += "File: " + currentRaceFile + "\n";
     
     writeFile(summaryFile, summary, false);
     
     currentRaceFile = "";
+    currentRawFile = "";
     raceStartTime = 0;
     
     return true;
@@ -247,7 +365,10 @@ bool DataLogger::formatSD() {
     Serial.println("[DataLogger] WARNING: Formatting SD card - ALL DATA WILL BE LOST!");
     
     // Close any open files
+    if (lapFile) lapFile.close();
+    if (rawFile) rawFile.close();
     currentRaceFile = "";
+    currentRawFile = "";
     
     // Note: ESP32 SD library doesn't support format directly
     // We need to use SDFat library or delete all files
@@ -383,10 +504,10 @@ String DataLogger::generateRaceFilename(const String& raceName) {
     uint32_t seconds = timestamp % 60;
     
     // Datum generieren (Platzhalter ohne RTC)
-    char filename[64];
-    sprintf(filename, "/races/%08lu_%02lu%02lu%02lu_%s.csv",
-            timestamp, hours, minutes, seconds,
-            sanitizeFilename(raceName).c_str());
+    char filename[96];
+    snprintf(filename, sizeof(filename), "/races/%08lu_%02lu%02lu%02lu_%.40s.csv",
+             (unsigned long)timestamp, (unsigned long)hours, (unsigned long)minutes,
+             (unsigned long)seconds, sanitizeFilename(raceName).c_str());
     
     return String(filename);
 }

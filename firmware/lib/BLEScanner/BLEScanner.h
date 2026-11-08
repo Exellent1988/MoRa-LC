@@ -5,6 +5,9 @@
 #include <NimBLEDevice.h>
 #include <vector>
 #include <map>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/semphr.h>
 
 // Forward declarations to avoid circular includes
 class NimBLEScan;
@@ -31,6 +34,13 @@ struct BeaconData {
     BeaconData() : major(0), minor(0), rssi(0), txPower(-59), lastSeen(0), wasPresent(false) {}
 };
 
+// Roh-Paket aus dem BLE-Task (keine Heap-Objekte -> sicher fuer Queue)
+struct BeaconSample {
+    uint8_t  mac[6];   // NimBLE-Reihenfolge (LSB zuerst)
+    int8_t   rssi;
+    uint32_t ts;       // millis() beim Empfang
+};
+
 typedef std::function<void(const BeaconData&)> BeaconCallback;
 
 class BLEScanner {
@@ -46,8 +56,17 @@ public:
     void stopScan();
     bool isScanning();
     
-    // Callback für neue Beacons
+    // Callback für neue Beacons (Achtung: laeuft im BLE-Task, nur fuer leichte Aufgaben!)
     void onBeaconDetected(BeaconCallback callback);
+
+    // Entkoppelter Pfad: Pakete der gefilterten Beacons landen in einer Queue.
+    // Aus loop() mit popSample() abholen.
+    bool popSample(BeaconSample& out);
+    uint32_t droppedSamples() const { return dropped; }
+    static void macToString(const uint8_t mac[6], char out[18]);  // "c3:00:..." (lowercase)
+
+    // Beacon-Liste (fuer UI) nur pflegen wenn noetig - spart waehrend des Rennens Heap/CPU
+    void setListEnabled(bool enabled) { listEnabled = enabled; }
     
     // Beacon-Daten abrufen
     std::vector<BeaconData> getBeacons();
@@ -69,6 +88,12 @@ private:
     BeaconCallback beaconCallback;
     
     std::map<String, BeaconData> beacons;  // UUID -> BeaconData
+    SemaphoreHandle_t mutex;
+    QueueHandle_t sampleQueue;
+    volatile uint32_t dropped;
+    volatile bool listEnabled;
+    char prefix[18];  // MAC-Praefix-Filter (lowercase), leer = alle
+    size_t prefixLen;
     
     String uuidFilter;
     int8_t rssiThreshold;

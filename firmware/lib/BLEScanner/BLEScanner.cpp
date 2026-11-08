@@ -36,8 +36,16 @@ BLEScanner::BLEScanner()
     : pBLEScan(nullptr)
     , beaconCallback(nullptr)
     , rssiThreshold(-100)
+    , mutex(nullptr)
+    , sampleQueue(nullptr)
+    , dropped(0)
+    , listEnabled(true)
+    , prefixLen(0)
     , scanning(false)
     , callbacks(nullptr) {
+    prefix[0] = 0;
+    mutex = xSemaphoreCreateMutex();
+    sampleQueue = xQueueCreate(256, sizeof(BeaconSample));
 }
 
 BLEScanner::~BLEScanner() {
@@ -74,9 +82,11 @@ bool BLEScanner::begin() {
     callbacks = new AdvertisedDeviceCallbacks(this);
     pBLEScan->setAdvertisedDeviceCallbacks(callbacks, false);  // false = wantDuplicates
     
-    pBLEScan->setActiveScan(true);   // Active scan für bessere Erkennung
+    // Passiv: iBeacon/Tracking-Beacons senden alles im Advertisement. Active Scan
+    // erzeugt nur zusaetzlichen Funkverkehr (Scan-Requests/-Responses) und kostet Pakete.
+    pBLEScan->setActiveScan(false);
     pBLEScan->setInterval(100);      // ms
-    pBLEScan->setWindow(99);         // ms
+    pBLEScan->setWindow(100);        // ms (= Interval: Radio dauerhaft im Scan)
     pBLEScan->setDuplicateFilter(false);  // Auch Duplicates melden!
     
     Serial.println("[BLE] Initialized successfully");
@@ -102,8 +112,8 @@ void BLEScanner::startScan(uint32_t duration) {
     Serial.printf("[BLE] Starting scan (duration: %u ms)\n", duration);
     scanning = true;
     
-    // duration = 0 bedeutet kontinuierlich
-    pBLEScan->start(duration / 1000, false);
+    // duration = 0 bedeutet kontinuierlich. Nicht-blockierende Variante (kein Callback).
+    pBLEScan->start(duration / 1000, nullptr, false);
     
     // Set log levels again AFTER start (in case NimBLE reset them)
     delay(10);  // Small delay to let scan initialize
@@ -127,7 +137,21 @@ void BLEScanner::stopScan() {
 }
 
 bool BLEScanner::isScanning() {
+    // Scan kann stillschweigend enden (Fehler/Timeout) -> Flag mit Realitaet abgleichen,
+    // damit loop() ihn neu startet.
+    if (scanning && pBLEScan && !pBLEScan->isScanning()) {
+        scanning = false;
+    }
     return scanning;
+}
+
+bool BLEScanner::popSample(BeaconSample& out) {
+    return sampleQueue && xQueueReceive(sampleQueue, &out, 0) == pdTRUE;
+}
+
+void BLEScanner::macToString(const uint8_t mac[6], char out[18]) {
+    snprintf(out, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
+             mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
 }
 
 void BLEScanner::onBeaconDetected(BeaconCallback callback) {
@@ -136,13 +160,16 @@ void BLEScanner::onBeaconDetected(BeaconCallback callback) {
 
 std::vector<BeaconData> BLEScanner::getBeacons() {
     std::vector<BeaconData> result;
+    xSemaphoreTake(mutex, portMAX_DELAY);
     for (auto& pair : beacons) {
         result.push_back(pair.second);
     }
+    xSemaphoreGive(mutex);
     return result;
 }
 
 BeaconData* BLEScanner::getBeacon(const String& uuid) {
+    // Hinweis: Zeiger bleibt gueltig bis clearOldBeacons() (laeuft im selben Task wie die UI)
     auto it = beacons.find(uuid);
     if (it != beacons.end()) {
         return &it->second;
@@ -166,6 +193,10 @@ BeaconData* BLEScanner::getNearestBeacon() {
 
 void BLEScanner::setUUIDFilter(const String& uuid) {
     uuidFilter = uuid;
+    strncpy(prefix, uuid.c_str(), sizeof(prefix) - 1);
+    prefix[sizeof(prefix) - 1] = 0;
+    for (char* c = prefix; *c; ++c) *c = tolower(*c);
+    prefixLen = strlen(prefix);
     Serial.printf("[BLE] UUID filter set: %s\n", uuid.c_str());
 }
 
@@ -176,17 +207,17 @@ void BLEScanner::setRSSIThreshold(int8_t threshold) {
 
 void BLEScanner::clearOldBeacons(uint32_t maxAge) {
     uint32_t now = millis();
+    xSemaphoreTake(mutex, portMAX_DELAY);
     auto it = beacons.begin();
     
     while (it != beacons.end()) {
         if (now - it->second.lastSeen > maxAge) {
-            Serial.printf("[BLE] Removing old beacon: %s (age: %u ms)\n", 
-                         it->first.c_str(), now - it->second.lastSeen);
             it = beacons.erase(it);
         } else {
             ++it;
         }
     }
+    xSemaphoreGive(mutex);
 }
 
 float BLEScanner::rssiToDistance(int8_t rssi, int8_t txPower) {
@@ -207,67 +238,58 @@ float BLEScanner::rssiToDistance(int8_t rssi, int8_t txPower) {
 // ============================================================
 
 void BLEScanner::AdvertisedDeviceCallbacks::onResult(NimBLEAdvertisedDevice* advertisedDevice) {
-    // CRITICAL: Disable logging in callback (called very frequently during scanning)
-    // NimBLE might enable logging again, so we disable it on every callback
-    esp_log_level_set("*", ESP_LOG_NONE);
-    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
-    esp_log_level_set("NimBLE", ESP_LOG_NONE);
-    esp_log_level_set("BLE", ESP_LOG_NONE);
-    
-    BeaconData beacon;
-    
-    // MAC-Adresse immer speichern
-    beacon.macAddress = advertisedDevice->getAddress().toString().c_str();
-    
-    // MAC-Adresse Filter (nur c3:00:... für Tracking-Beacons)
-    if (scanner->uuidFilter.length() > 0) {
-        if (!beacon.macAddress.startsWith(scanner->uuidFilter)) {
-            // Nicht unser Beacon, ignorieren
-            return;
+    // Laeuft im NimBLE-Task: schnell bleiben, nichts Blockierendes (kein Serial, keine SD, kein Heap im Hotpath).
+    const uint8_t* native = advertisedDevice->getAddress().getNative();
+
+    BeaconSample sample;
+    memcpy(sample.mac, native, 6);
+    sample.rssi = advertisedDevice->getRSSI();
+    sample.ts = millis();
+
+    char macStr[18];
+    BLEScanner::macToString(sample.mac, macStr);
+
+    // MAC-Praefix-Filter
+    if (scanner->prefixLen > 0 && strncmp(macStr, scanner->prefix, scanner->prefixLen) != 0) {
+        return;
+    }
+    if (sample.rssi < scanner->rssiThreshold) {
+        return;
+    }
+
+    // 1) Roh-Paket in die Queue (nie blockieren; bei voller Queue zaehlen wir Verluste)
+    if (xQueueSend(scanner->sampleQueue, &sample, 0) != pdTRUE) {
+        scanner->dropped++;
+    }
+
+    // 2) Beacon-Liste fuer die UI (nur wenn gebraucht)
+    if (scanner->listEnabled) {
+        BeaconData beacon;
+        beacon.macAddress = macStr;
+        if (!scanner->parseIBeacon(advertisedDevice, beacon)) {
+            beacon.uuid = beacon.macAddress;
+            beacon.txPower = -59;
+            beacon.rssi = sample.rssi;
+            beacon.lastSeen = sample.ts;
+        }
+        if (xSemaphoreTake(scanner->mutex, 0) == pdTRUE) {  // nie warten
+            auto it = scanner->beacons.find(beacon.macAddress);
+            if (it != scanner->beacons.end()) {
+                beacon.wasPresent = it->second.wasPresent;
+            }
+            beacon.wasPresent = true;
+            scanner->beacons[beacon.macAddress] = beacon;
+            xSemaphoreGive(scanner->mutex);
         }
     }
-    
-    // Try to parse as iBeacon first
-    if (!scanner->parseIBeacon(advertisedDevice, beacon)) {
-        // Fallback: Use MAC address as UUID for non-iBeacon devices
-        beacon.uuid = beacon.macAddress;
-        beacon.major = 0;
-        beacon.minor = 0;
-        beacon.txPower = -59;  // Default TX power
-        beacon.rssi = advertisedDevice->getRSSI();
-        beacon.lastSeen = millis();
-        
-        // Silent logging - only store, don't spam serial
-    } else {
-        // iBeacon parsed successfully - no logging spam
-    }
-    
-    // RSSI Filter
-    if (beacon.rssi < scanner->rssiThreshold) {
-        return;  // Silently filter - no logging spam
-    }
-    
-    // Update beacon data (Key = MAC-Adresse!)
-    String key = beacon.macAddress;
-    bool isNew = (scanner->beacons.find(key) == scanner->beacons.end());
-    
-    // Presence Detection: War Beacon vorher weg?
-    if (!isNew) {
-        beacon.wasPresent = scanner->beacons[key].wasPresent;
-    }
-    
-    scanner->beacons[key] = beacon;
-    scanner->beacons[key].wasPresent = true;  // Jetzt ist er da
-    
-    // Only log new beacons to reduce spam
-    if (isNew) {
-        Serial.printf("[BLE] New beacon: MAC=%s, RSSI=%d dBm\n",
-                     beacon.macAddress.c_str(), beacon.rssi);
-    }
-    
-    // Callback IMMER aufrufen (auch für Updates!)
+
     if (scanner->beaconCallback) {
-        scanner->beaconCallback(scanner->beacons[key]);
+        // Nur fuer Kompatibilitaet; Lap-Erkennung nutzt popSample()
+        BeaconData b;
+        b.macAddress = macStr;
+        b.rssi = sample.rssi;
+        b.lastSeen = sample.ts;
+        scanner->beaconCallback(b);
     }
 }
 
