@@ -50,6 +50,8 @@
 // Lap Detection
 #define DEFAULT_LAP_RSSI_NEAR -65
 #define DEFAULT_LAP_RSSI_FAR  -80
+#define LAP_LOST_TIMEOUT_MS 2000   // keine Pakete so lange -> Durchfahrt beendet
+#define LAP_RSSI_SMOOTHING  0.5f   // EMA-Faktor (1.0 = aus)
 #define MIN_RSSI -100
 #define MAX_RSSI -30
 

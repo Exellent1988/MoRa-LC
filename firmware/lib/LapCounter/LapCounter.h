@@ -55,6 +55,10 @@ public:
     bool recordLap(const String& beaconUUID, uint32_t timestamp = 0);
     bool recordLap(uint8_t teamId, uint32_t timestamp = 0);
     
+    // Wiederherstellung nach Neustart (aus der Runden-CSV); Timestamps schon auf neue millis()-Basis umgerechnet
+    bool restoreStart(uint8_t teamId, uint32_t timestamp);
+    bool restoreLap(uint8_t teamId, uint16_t lapNumber, uint32_t timestamp, uint32_t duration);
+    
     // Statistiken
     float getAverageLapTime(uint8_t teamId);
     uint32_t getBestLapTime(uint8_t teamId);
