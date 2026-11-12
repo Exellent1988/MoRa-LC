@@ -8,6 +8,7 @@
 #include "../../lib/LapCounter/LapCounter.h"
 #include "../../lib/DataLogger/DataLogger.h"
 #include "../../lib/LapDetector/LapDetector.h"
+#include "../../lib/LapDetector/LapCsv.h"
 #include "../ultralight/persistence.h"
 #include <map>
 
@@ -82,10 +83,15 @@ static void handleLap(TeamData* team, uint32_t lapTs) {
     Serial.printf("[Lap] Team %u (%s): Lap %u\n",
                   team->teamId, team->teamName.c_str(), team->lapCount);
 
-    if (dataLogger.isReady() && !team->laps.empty()) {
-        LapTime& lap = team->laps.back();
-        dataLogger.logLap(team->teamId, team->teamName,
-                          lap.lapNumber, lap.timestamp, lap.duration);
+    if (dataLogger.isReady()) {
+        if (team->laps.empty()) {
+            // Start-Durchfahrt: als Runde 0 loggen, damit sie nach einem Reset wiederherstellbar ist
+            dataLogger.logLap(team->teamId, team->teamName, 0, lapTs, 0);
+        } else {
+            LapTime& lap = team->laps.back();
+            dataLogger.logLap(team->teamId, team->teamName,
+                              lap.lapNumber, lap.timestamp, lap.duration);
+        }
     }
     uiState.needsRedraw = true;
 }
@@ -93,7 +99,10 @@ static void handleLap(TeamData* team, uint32_t lapTs) {
 // Alle Pakete aus der BLE-Queue abarbeiten (im Loop, nicht im BLE-Task)
 static void processBeaconSamples() {
     static bool wasRunning = false;
-    if (raceRunning && !wasRunning) prepareRaceTracking();
+    if (raceRunning && !wasRunning) {
+        prepareRaceTracking();
+        dataLogger.writeActiveState(currentRaceName, raceDuration);
+    }
     wasRunning = raceRunning;
 
     BeaconSample sample;
@@ -127,7 +136,58 @@ static void processBeaconSamples() {
             }
         }
         dataLogger.serviceRaw();
+
+        // Zustand regelmaessig sichern (Wiederherstellung nach Reset/Stromausfall)
+        static uint32_t lastActiveWrite = 0;
+        if (millis() - lastActiveWrite > 5000) {
+            lastActiveWrite = millis();
+            dataLogger.writeActiveState(currentRaceName, raceDuration);
+        }
     }
+}
+
+// Beim Booten: unterbrochenes Rennen aus SD wiederherstellen (startet pausiert)
+static bool tryRestoreRace() {
+    ActiveRaceState st;
+    if (!dataLogger.readActiveState(st)) return false;
+    if (!dataLogger.exists(st.file)) {
+        dataLogger.clearActiveState();
+        return false;
+    }
+
+    lapCounter.reset();
+    // Umrechnung alte -> neue millis()-Basis (uint32-Wraparound ist gewollt)
+    uint32_t newStart = millis() - st.elapsedMs;
+    uint32_t offset = newStart - st.startMillis;
+
+    String csv = dataLogger.readFile(st.file);
+    int pos = 0, restored = 0;
+    while (pos < (int)csv.length()) {
+        int nl = csv.indexOf('\n', pos);
+        if (nl < 0) nl = csv.length();
+        String line = csv.substring(pos, nl);
+        pos = nl + 1;
+        line.trim();
+        LapCsvRow row;
+        if (!parseLapCsvLine(line.c_str(), row)) continue;
+        uint32_t ts = row.ts + offset;
+        bool ok = (row.lap == 0)
+            ? lapCounter.restoreStart((uint8_t)row.teamId, ts)
+            : lapCounter.restoreLap((uint8_t)row.teamId, (uint16_t)row.lap, ts, row.dur);
+        if (ok) restored++;
+    }
+
+    currentRaceName = st.name;
+    raceDuration = st.durationMs;
+    raceStartTime = newStart;
+    uiState.raceName = st.name;
+    uiState.raceDuration = st.durationMs / 60000;
+    raceRunning = false;   // pausiert: Nutzer entscheidet "Weitermachen" / "Rennen beenden"
+    dataLogger.resumeRace(st);
+
+    Serial.printf("[Recovery] Race '%s' restored: %d rows, elapsed %lu s\n",
+                  st.name.c_str(), restored, (unsigned long)(st.elapsedMs / 1000));
+    return true;
 }
 
 // Alle 5 s eine Diagnosezeile (Pakete, Queue-Verluste, SD-Fehler)
@@ -284,8 +344,12 @@ void setup() {
     display.calibrateTouch();
     #endif
     
-    // Initialize UI state and show home screen
-    uiState.changeScreen(SCREEN_HOME);
+    // Unterbrochenes Rennen? -> pausiert wiederherstellen, sonst Home
+    if (tryRestoreRace()) {
+        uiState.changeScreen(SCREEN_RACE_PAUSED);
+    } else {
+        uiState.changeScreen(SCREEN_HOME);
+    }
 }
 
 // Forward declaration

@@ -67,4 +67,6 @@ Umgesetzt (kompiliert mit `pio run -e ultralight_v2`, **noch nicht auf Hardware 
 - B8: SD-Dateien bleiben offen, `flush()` pro Runde, Recover bei Schreibfehler, Fehleranzeige im Rennscreen, Dateikollisionen nach Reboot behoben.
 - Phase 2: Roh-Log `*_raw.csv`, native Tests (`firmware/tools/run_native_tests.sh`), Replay-Tool (`firmware/tools/replay/replay.cpp`), Diagnose-Zeile alle 5 s im Serial.
 
-Offen: B9 (Crash-Recovery), Diagnose-Screen im UI, Beacon-Simulator, RTC/NTP.
+- B9: Rennstand wird alle 5 s auf SD gesichert (`/races/.active`); nach Reset/Stromausfall startet das Geraet pausiert mit allen Runden aus der CSV (Start-Durchfahrt wird als Runde 0 geloggt). Weitermachen oder beenden per Pause-Screen.
+
+Offen: Diagnose-Screen im UI, Beacon-Simulator, RTC/NTP. (Sektoren/Gates: vorerst verworfen.)

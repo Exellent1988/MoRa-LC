@@ -129,6 +129,25 @@ bool LapCounter::recordLap(uint8_t teamId, uint32_t timestamp) {
     return true;
 }
 
+bool LapCounter::restoreStart(uint8_t teamId, uint32_t timestamp) {
+    TeamData* team = findTeam(teamId);
+    if (!team) return false;
+    if (team->lapCount < 1) team->lapCount = 1;
+    team->lastLapTime = timestamp;
+    return true;
+}
+
+bool LapCounter::restoreLap(uint8_t teamId, uint16_t lapNumber, uint32_t timestamp, uint32_t duration) {
+    TeamData* team = findTeam(teamId);
+    if (!team || lapNumber == 0) return false;
+    team->laps.push_back(LapTime(lapNumber, timestamp, duration));
+    if (team->lapCount < lapNumber + 1) team->lapCount = lapNumber + 1;
+    team->lastLapTime = timestamp;
+    team->totalDuration += duration;
+    updateStatistics(team);
+    return true;
+}
+
 float LapCounter::getAverageLapTime(uint8_t teamId) {
     TeamData* team = findTeam(teamId);
     if (!team || team->laps.empty()) {

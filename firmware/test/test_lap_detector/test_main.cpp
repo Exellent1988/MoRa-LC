@@ -1,5 +1,6 @@
 // Native Tests: ./tools/run_native_tests.sh
 #include "../../lib/LapDetector/LapDetector.h"
+#include "../../lib/LapDetector/LapCsv.h"
 #include <cstdio>
 #include <cstdlib>
 
@@ -93,7 +94,21 @@ static void test_ten_teams_interleaved() {
     for (int team = 0; team < 10; team++) CHECK(laps[team] == 5);
 }
 
+static void test_csv_parser() {
+    LapCsvRow r;
+    CHECK(!parseLapCsvLine("Team ID,Team Name,Lap Number,Timestamp (ms),Duration (ms),Time of Day", r));
+    CHECK(!parseLapCsvLine("", r));
+    CHECK(parseLapCsvLine("3,Rot,12,123456,31234,00:02:03", r));
+    CHECK(r.teamId == 3 && r.lap == 12 && r.ts == 123456 && r.dur == 31234);
+    CHECK(parseLapCsvLine("4,Team A, B,1,5000,7000,00:00:07", r));  // Komma im Namen
+    CHECK(r.teamId == 4 && r.lap == 1 && r.ts == 5000 && r.dur == 7000);
+    CHECK(parseLapCsvLine("5,Start,0,999,0,00:00:00", r));
+    CHECK(r.lap == 0 && r.ts == 999 && r.dur == 0);
+    CHECK(!parseLapCsvLine("7,abc", r));
+}
+
 int main() {
+    test_csv_parser();
     test_single_pass();
     test_missed_far_packet_still_counts_next_lap();
     test_min_lap_time();

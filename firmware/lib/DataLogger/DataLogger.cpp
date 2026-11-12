@@ -283,6 +283,66 @@ void DataLogger::serviceRaw(bool force) {
     rawLen = 0;  // Rohdaten sind "best effort": bei Fehler nicht endlos puffern
 }
 
+static const char* ACTIVE_FILE = "/races/.active";
+
+bool DataLogger::writeActiveState(const String& name, uint32_t durationMs) {
+    if (!initialized || currentRaceFile.isEmpty()) return false;
+    File f = SD.open(ACTIVE_FILE, FILE_WRITE);  // ueberschreibt
+    if (!f) { writeErrors++; lastWriteFailed = true; return false; }
+    String s = "file=" + currentRaceFile + "\n";
+    s += "raw=" + currentRawFile + "\n";
+    s += "name=" + name + "\n";
+    s += "durationMs=" + String(durationMs) + "\n";
+    s += "elapsedMs=" + String(millis() - raceStartTime) + "\n";
+    s += "startMillis=" + String(raceStartTime) + "\n";
+    size_t n = f.print(s);
+    f.close();
+    return n == s.length();
+}
+
+bool DataLogger::readActiveState(ActiveRaceState& out) {
+    if (!initialized || !SD.exists(ACTIVE_FILE)) return false;
+    String c = readFile(ACTIVE_FILE);
+    int pos = 0;
+    bool haveFile = false;
+    while (pos < (int)c.length()) {
+        int nl = c.indexOf('\n', pos);
+        if (nl < 0) nl = c.length();
+        String line = c.substring(pos, nl);
+        pos = nl + 1;
+        line.trim();
+        int eq = line.indexOf('=');
+        if (eq < 0) continue;
+        String k = line.substring(0, eq), v = line.substring(eq + 1);
+        if (k == "file") { out.file = v; haveFile = true; }
+        else if (k == "raw") out.raw = v;
+        else if (k == "name") out.name = v;
+        else if (k == "durationMs") out.durationMs = strtoul(v.c_str(), nullptr, 10);
+        else if (k == "elapsedMs") out.elapsedMs = strtoul(v.c_str(), nullptr, 10);
+        else if (k == "startMillis") out.startMillis = strtoul(v.c_str(), nullptr, 10);
+    }
+    return haveFile && out.file.length() > 0;
+}
+
+void DataLogger::clearActiveState() {
+    if (initialized && SD.exists(ACTIVE_FILE)) SD.remove(ACTIVE_FILE);
+}
+
+bool DataLogger::resumeRace(const ActiveRaceState& st) {
+    if (!initialized) return false;
+    if (lapFile) lapFile.close();
+    if (rawFile) rawFile.close();
+    currentRaceFile = st.file;
+    currentRawFile = st.raw;
+    raceStartTime = millis() - st.elapsedMs;
+    rawLen = 0;
+    lastRawFlush = millis();
+    lapFile = SD.open(currentRaceFile.c_str(), FILE_APPEND);
+    if (!currentRawFile.isEmpty()) rawFile = SD.open(currentRawFile.c_str(), FILE_APPEND);
+    Serial.printf("[DataLogger] Resumed race file: %s\n", currentRaceFile.c_str());
+    return (bool)lapFile;
+}
+
 bool DataLogger::finishRace() {
     if (currentRaceFile.isEmpty()) {
         return false;
@@ -305,6 +365,7 @@ bool DataLogger::finishRace() {
     summary += "File: " + currentRaceFile + "\n";
     
     writeFile(summaryFile, summary, false);
+    clearActiveState();
     
     currentRaceFile = "";
     currentRawFile = "";
